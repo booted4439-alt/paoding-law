@@ -1,0 +1,5 @@
+{
+  "message": "Requires authentication",
+  "documentation_url": "https://docs.github.com/rest/repos/repos#list-repositories-for-the-authenticated-user",
+  "status": "401"
+}
