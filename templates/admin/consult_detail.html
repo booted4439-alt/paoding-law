@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}咨询详情 — 庖丁法律服务{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <nav class="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="/admin" class="admin-nav-link">概览</a>
+        <a href="/admin/consultations" class="admin-nav-link active">咨询管理</a>
+        <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/settings" class="admin-nav-link">网站设置</a>
+    </nav>
+    <div class="admin-main">
+        <a href="/admin/consultations" class="btn btn-sm btn-outline">← 返回列表</a>
+        <h2>咨询 #{{ consultation.id }} - {{ consultation.title }}</h2>
+        <div class="consult-info">
+            <p><strong>用户：</strong>{{ consultation.client.username if consultation.client else '未知' }}</p>
+            <p><strong>状态：</strong><span class="status-badge status-{{ consultation.status }}">{{ {'pending':'待处理','active':'进行中','closed':'已关闭'}[consultation.status] }}</span></p>
+            <p><strong>创建时间：</strong>{{ consultation.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+        </div>
+
+        <div class="admin-chat" id="admin-chat">
+            <div class="admin-messages" id="admin-messages"></div>
+            <div class="admin-chat-input">
+                <form onsubmit="return adminSend(event)">
+                    <textarea id="admin-msg-input" rows="2" placeholder="回复消息..."></textarea>
+                    <button type="submit" class="btn btn-primary">发送</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const cid = {{ consultation.id }};
+const socket = io();
+socket.emit('join', { consultation_id: cid });
+socket.on('new_message', function(data) {
+    if (data.consultation_id == cid) appendMsg(data.message);
+});
+
+function loadMessages() {
+    fetch('/api/consultations/' + cid + '/messages')
+        .then(r => r.json())
+        .then(msgs => {
+            document.getElementById('admin-messages').innerHTML = '';
+            msgs.forEach(m => appendMsg(m));
+        });
+}
+
+function appendMsg(m) {
+    const container = document.getElementById('admin-messages');
+    const div = document.createElement('div');
+    div.className = 'message ' + (m.sender_id != {{ consultation.user_id }} ? 'message-self' : 'message-other');
+    let html = `<div class="message-sender">${escHtml(m.sender)}</div>`;
+    if (m.content) html += `<div class="message-content">${escHtml(m.content)}</div>`;
+    if (m.file_url) {
+        const isImg = ['png','jpg','jpeg','gif','webp','bmp'].includes(m.file_type);
+        if (isImg) html += `<div><img src="${m.file_url}" class="msg-img"></div>`;
+        else html += `<div><a href="${m.file_url}" target="_blank">📎 下载</a></div>`;
+    }
+    html += `<div class="message-time">${m.created_at}</div>`;
+    div.innerHTML = html;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function adminSend(e) {
+    e.preventDefault();
+    const input = document.getElementById('admin-msg-input');
+    const content = input.value.trim();
+    if (!content) return false;
+    const formData = new FormData();
+    formData.append('content', content);
+    fetch('/api/consultations/' + cid + '/messages', { method: 'POST', body: formData })
+        .then(r => r.json()).then(data => {
+            if (data.ok) input.value = '';
+        });
+    return false;
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+loadMessages();
+</script>
+{% endblock %}

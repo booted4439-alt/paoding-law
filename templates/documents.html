@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}法律文档 — 庖丁法律服务{% endblock %}
+{% block body_class %}docs-page{% endblock %}
+{% block content %}
+<div class="docs-layout">
+    <aside class="docs-sidebar">
+        <div class="docs-search">
+            <input type="text" id="doc-search" placeholder="搜索文档..." oninput="searchDocs()">
+        </div>
+        <h3>分类</h3>
+        <div class="docs-categories">
+            <button class="cat-btn active" data-cat="" onclick="filterDocs('')">全部</button>
+            {% for cat in categories %}
+            <button class="cat-btn" data-cat="{{ cat }}" onclick="filterDocs('{{ cat }}')">{{ cat }}</button>
+            {% endfor %}
+        </div>
+    </aside>
+    <div class="docs-main">
+        <div class="docs-list" id="docs-list"></div>
+        <div class="doc-detail" id="doc-detail" style="display:none">
+            <button class="btn btn-sm btn-outline" onclick="backToList()">← 返回列表</button>
+            <div id="doc-content"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allDocs = [];
+
+function loadDocs() {
+    fetch('/api/documents')
+        .then(r => r.json())
+        .then(docs => { allDocs = docs; renderDocs(docs); });
+}
+
+function renderDocs(docs) {
+    const list = document.getElementById('docs-list');
+    list.innerHTML = docs.map(d => `
+        <div class="doc-card" onclick="showDoc(${d.id})">
+            <div class="doc-category">${escHtml(d.category)}</div>
+            <h4>${escHtml(d.title)}</h4>
+            ${d.summary ? `<p>${escHtml(d.summary)}</p>` : ''}
+            <div class="doc-meta">更新于 ${d.updated_at}</div>
+        </div>
+    `).join('');
+}
+
+function searchDocs() {
+    const q = document.getElementById('doc-search').value.trim();
+    if (!q) return renderDocs(allDocs);
+    const filtered = allDocs.filter(d =>
+        d.title.includes(q) || (d.summary && d.summary.includes(q))
+    );
+    renderDocs(filtered);
+}
+
+function filterDocs(cat) {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+    if (!cat) return renderDocs(allDocs);
+    renderDocs(allDocs.filter(d => d.category === cat));
+}
+
+function showDoc(id) {
+    fetch('/api/documents/' + id)
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('docs-list').style.display = 'none';
+            const detail = document.getElementById('doc-detail');
+            detail.style.display = 'block';
+            document.getElementById('doc-content').innerHTML = `
+                <h2>${escHtml(d.title)}</h2>
+                <div class="doc-meta">分类: ${escHtml(d.category)} | 更新于 ${d.updated_at}</div>
+                <div class="doc-body">${renderContent(d.content)}</div>
+            `;
+        });
+}
+
+function backToList() {
+    document.getElementById('docs-list').style.display = 'block';
+    document.getElementById('doc-detail').style.display = 'none';
+}
+
+function renderContent(content) {
+    // simple markdown-like rendering
+    return content.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>');
+}
+
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+
+loadDocs();
+</script>
+{% endblock %}

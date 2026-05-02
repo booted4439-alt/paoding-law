@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}网站设置 — 庖丁法律服务{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <nav class="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="/admin" class="admin-nav-link">概览</a>
+        <a href="/admin/consultations" class="admin-nav-link">咨询管理</a>
+        <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/settings" class="admin-nav-link active">网站设置</a>
+    </nav>
+    <div class="admin-main">
+        <h2>网站设置</h2>
+        <form onsubmit="return saveSettings(event)">
+            <div class="form-group">
+                <label>网站名称</label>
+                <input type="text" id="set-site_name">
+            </div>
+            <div class="form-group">
+                <label>地址</label>
+                <input type="text" id="set-address">
+            </div>
+            <div class="form-group">
+                <label>电话</label>
+                <input type="text" id="set-phone">
+            </div>
+            <div class="form-group">
+                <label>微信公众号二维码 (图片URL)</label>
+                <input type="text" id="set-wechat_qr" placeholder="上传图片后粘贴URL">
+            </div>
+            <div class="form-group">
+                <label>ICP备案号</label>
+                <input type="text" id="set-icp_beian">
+            </div>
+            <div class="form-group">
+                <label>公安备案号</label>
+                <input type="text" id="set-police_beian">
+            </div>
+            <div class="form-group">
+                <label>隐私政策内容 (Markdown)</label>
+                <textarea id="set-privacy_content" rows="10"></textarea>
+            </div>
+            <div class="form-group">
+                <label>用户协议内容 (Markdown)</label>
+                <textarea id="set-terms_content" rows="10"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">保存设置</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function loadSettings() {
+    fetch('/admin/api/settings')
+        .then(r => r.json())
+        .then(data => {
+            for (const [k, v] of Object.entries(data)) {
+                const el = document.getElementById('set-' + k);
+                if (el) el.value = v || '';
+            }
+        });
+}
+
+function saveSettings(e) {
+    e.preventDefault();
+    const data = {};
+    document.querySelectorAll('[id^="set-"]').forEach(el => {
+        data[el.id.replace('set-', '')] = el.value;
+    });
+    fetch('/admin/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    }).then(r => r.json()).then(() => {
+        alert('设置已保存');
+    });
+    return false;
+}
+
+loadSettings();
+</script>
+{% endblock %}

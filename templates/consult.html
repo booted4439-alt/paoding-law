@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}开始咨询 — 庖丁法律服务{% endblock %}
+{% block body_class %}chat-page{% endblock %}
+{% block content %}
+<div class="consult-layout">
+    <!-- Sidebar -->
+    <aside class="consult-sidebar">
+        <div class="sidebar-header">
+            <h2>我的咨询</h2>
+            <button class="btn btn-sm btn-primary" onclick="newConsultation()">+ 新咨询</button>
+        </div>
+        <div class="sidebar-filters">
+            <button class="filter-btn active" data-filter="" onclick="loadConsultations('')">全部</button>
+            <button class="filter-btn" data-filter="pending" onclick="loadConsultations('pending')">待处理</button>
+            <button class="filter-btn" data-filter="active" onclick="loadConsultations('active')">进行中</button>
+            <button class="filter-btn" data-filter="closed" onclick="loadConsultations('closed')">已关闭</button>
+        </div>
+        <div class="sidebar-list" id="consult-list"></div>
+    </aside>
+
+    <!-- Chat Area -->
+    <div class="consult-main">
+        <div class="chat-placeholder" id="chat-placeholder">
+            <div class="placeholder-icon">💬</div>
+            <h3>选择一个咨询开始对话</h3>
+            <p>或点击"新咨询"发起法律咨询</p>
+        </div>
+        <div class="chat-container" id="chat-container" style="display:none">
+            <div class="chat-header" id="chat-header">
+                <div>
+                    <h3 id="chat-title"></h3>
+                    <span class="chat-status" id="chat-status"></span>
+                </div>
+                <div class="chat-header-actions">
+                    <button class="btn btn-sm btn-outline" onclick="closeConsultation()">关闭</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteConsultation()">删除</button>
+                </div>
+            </div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-area" id="chat-input-area">
+                <form id="message-form" onsubmit="return sendMessage(event)">
+                    <button type="button" class="upload-btn" onclick="document.getElementById('file-input').click()" title="上传文件">📎</button>
+                    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this.files)">
+                    <div class="file-previews" id="file-previews"></div>
+                    <textarea id="message-input" rows="1" placeholder="输入您的问题..." oninput="autoResize(this)"></textarea>
+                    <button type="submit" class="send-btn">发送</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Consultation Modal -->
+<div class="modal" id="new-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>发起新咨询</h3>
+            <button class="modal-close" onclick="closeModal('new-modal')">&times;</button>
+        </div>
+        <form onsubmit="return submitConsultation(event)">
+            <div class="form-group">
+                <label>咨询标题</label>
+                <input type="text" id="consult-title" required placeholder="例如：合同审核、劳动纠纷...">
+            </div>
+            <div class="form-group">
+                <label>问题描述</label>
+                <textarea id="consult-desc" rows="4" placeholder="请详细描述您遇到的法律问题..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">提交咨询</button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+let currentConsultationId = null;
+let socket = null;
+let uploadedFiles = [];
+let currentFilter = '';
+
+function initSocket(cid) {
+    if (socket) socket.disconnect();
+    socket = io();
+    socket.emit('join', { consultation_id: cid });
+    socket.on('new_message', function(data) {
+        if (data.consultation_id == currentConsultationId) {
+            appendMessage(data.message);
+        }
+        loadConsultations(currentFilter);
+    });
+}
+
+function loadConsultations(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === filter);
+    });
+    fetch('/api/consultations?status=' + filter)
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('consult-list');
+            list.innerHTML = data.consultations.map(c => `
+                <div class="consult-item ${c.id === currentConsultationId ? 'active' : ''}"
+                     onclick="openConsultation(${c.id})">
+                    <div class="consult-item-title">${escHtml(c.title)}</div>
+                    <div class="consult-item-meta">
+                        <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
+                        <span>${c.updated_at}</span>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function openConsultation(id) {
+    currentConsultationId = id;
+    initSocket(id);
+    document.getElementById('chat-placeholder').style.display = 'none';
+    document.getElementById('chat-container').style.display = 'flex';
+    fetch('/api/consultations/' + id + '/messages')
+        .then(r => r.json())
+        .then(msgs => {
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = '';
+            msgs.forEach(m => appendMessage(m));
+            container.scrollTop = container.scrollHeight;
+        });
+    // update header
+    fetch('/api/consultations?status=')
+        .then(r => r.json())
+        .then(data => {
+            const c = data.consultations.find(x => x.id === id);
+            if (c) {
+                document.getElementById('chat-title').textContent = escHtml(c.title);
+                document.getElementById('chat-status').textContent = statusLabel(c.status);
+            }
+        });
+    document.querySelectorAll('.consult-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.consult-item:nth-child(${id})`)?.classList.add('active');
+}
+
+function appendMessage(m) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'message ' + (m.sender_id === {{ current_user.id if current_user.is_authenticated else '0' }} ? 'message-self' : 'message-other');
+    let html = `<div class="message-sender">${escHtml(m.sender)}</div>`;
+    if (m.content) html += `<div class="message-content">${escHtml(m.content)}</div>`;
+    if (m.file_url) {
+        const isImg = ['png','jpg','jpeg','gif','webp','bmp'].includes(m.file_type);
+        if (isImg) html += `<div class="message-file"><img src="${m.file_url}" class="msg-img"></div>`;
+        else html += `<div class="message-file"><a href="${m.file_url}" target="_blank">📎 下载文件</a></div>`;
+    }
+    html += `<div class="message-time">${m.created_at}</div>`;
+    div.innerHTML = html;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('message-input');
+    const content = input.value.trim();
+    if (!content && uploadedFiles.length === 0) return false;
+
+    const formData = new FormData();
+    formData.append('content', content);
+    for (const f of uploadedFiles) {
+        formData.append('file', f);
+    }
+    fetch('/api/consultations/' + currentConsultationId + '/messages', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                input.value = '';
+                uploadedFiles = [];
+                document.getElementById('file-previews').innerHTML = '';
+                loadConsultations(currentFilter);
+            }
+        });
+    return false;
+}
+
+function handleFiles(files) {
+    for (const f of files) uploadedFiles.push(f);
+    const previews = document.getElementById('file-previews');
+    previews.innerHTML = uploadedFiles.map((f, i) =>
+        `<span class="file-tag">📎 ${escHtml(f.name)} <button onclick="removeFile(${i})">&times;</button></span>`
+    ).join('');
+}
+
+function removeFile(i) { uploadedFiles.splice(i, 1); handleFiles([]); }
+
+function newConsultation() { document.getElementById('new-modal').style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+function submitConsultation(e) {
+    e.preventDefault();
+    const title = document.getElementById('consult-title').value.trim();
+    const desc = document.getElementById('consult-desc').value.trim();
+    fetch('/api/consultations', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title, description: desc})
+    }).then(r => r.json()).then(data => {
+        if (data.id) {
+            closeModal('new-modal');
+            document.getElementById('consult-title').value = '';
+            document.getElementById('consult-desc').value = '';
+            loadConsultations(currentFilter);
+            openConsultation(data.id);
+        }
+    });
+    return false;
+}
+
+function closeConsultation() {
+    currentConsultationId = null;
+    document.getElementById('chat-placeholder').style.display = 'flex';
+    document.getElementById('chat-container').style.display = 'none';
+    if (socket) socket.disconnect();
+}
+
+function deleteConsultation() {
+    if (!currentConsultationId || !confirm('确定删除此咨询？')) return;
+    fetch('/api/consultations/' + currentConsultationId, { method: 'DELETE' })
+        .then(r => r.json()).then(() => {
+            closeConsultation();
+            loadConsultations(currentFilter);
+        });
+}
+
+function statusLabel(s) {
+    return {'pending':'待处理','active':'进行中','closed':'已关闭'}[s] || s;
+}
+
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+}
+
+// Init
+loadConsultations('');
+</script>
+{% endblock %}

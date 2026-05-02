@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}管理后台 — 庖丁法律服务{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <nav class="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="/admin" class="admin-nav-link">概览</a>
+        <a href="/admin/consultations" class="admin-nav-link">咨询管理</a>
+        <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/settings" class="admin-nav-link">网站设置</a>
+    </nav>
+    <div class="admin-main">
+        <h2>概览</h2>
+        <div class="admin-stats" id="admin-stats">
+            <div class="stat-card">
+                <div class="stat-num" id="stat-pending">-</div>
+                <div class="stat-label">待处理咨询</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="stat-active">-</div>
+                <div class="stat-label">进行中咨询</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="stat-closed">-</div>
+                <div class="stat-label">已完成</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="stat-users">-</div>
+                <div class="stat-label">注册用户</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+fetch('/admin/api/consultations')
+    .then(r => r.json())
+    .then(data => {
+        const counts = {pending: 0, active: 0, closed: 0};
+        data.consultations.forEach(c => { counts[c.status]++; });
+        document.getElementById('stat-pending').textContent = counts.pending;
+        document.getElementById('stat-active').textContent = counts.active;
+        document.getElementById('stat-closed').textContent = counts.closed;
+    });
+fetch('/api/consultations')
+    .then(r => r.json())
+    .then(data => {
+        // rough user count from first page total
+    });
+</script>
+{% endblock %}

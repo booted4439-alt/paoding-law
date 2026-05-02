@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}咨询管理 — 庖丁法律服务{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <nav class="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="/admin" class="admin-nav-link">概览</a>
+        <a href="/admin/consultations" class="admin-nav-link active">咨询管理</a>
+        <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/settings" class="admin-nav-link">网站设置</a>
+    </nav>
+    <div class="admin-main">
+        <h2>咨询管理</h2>
+        <div class="admin-filters">
+            <button class="filter-btn active" onclick="adminLoadCons('')">全部</button>
+            <button class="filter-btn" onclick="adminLoadCons('pending')">待处理</button>
+            <button class="filter-btn" onclick="adminLoadCons('active')">进行中</button>
+            <button class="filter-btn" onclick="adminLoadCons('closed')">已关闭</button>
+        </div>
+        <div class="admin-table" id="admin-cons-table"></div>
+    </div>
+</div>
+
+<script>
+function adminLoadCons(status) {
+    document.querySelectorAll('.admin-filters .filter-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    fetch('/admin/api/consultations?status=' + status)
+        .then(r => r.json())
+        .then(data => {
+            const table = document.getElementById('admin-cons-table');
+            table.innerHTML = `<table>
+                <thead><tr><th>ID</th><th>标题</th><th>用户</th><th>律师</th><th>状态</th><th>消息数</th><th>时间</th><th>操作</th></tr></thead>
+                <tbody>
+                    ${data.consultations.map(c => `<tr>
+                        <td>${c.id}</td>
+                        <td>${escHtml(c.title)}</td>
+                        <td>${escHtml(c.client)}</td>
+                        <td>${c.lawyer ? escHtml(c.lawyer) : '<span class="text-muted">未分配</span>'}</td>
+                        <td><span class="status-badge status-${c.status}">${statusLabel(c.status)}</span></td>
+                        <td>${c.message_count}</td>
+                        <td>${c.created_at}</td>
+                        <td><a href="/admin/consultations/${c.id}" class="btn btn-sm btn-outline">查看</a></td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+        });
+}
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+function statusLabel(s) { return {'pending':'待处理','active':'进行中','closed':'已关闭'}[s]||s; }
+adminLoadCons('');
+</script>
+{% endblock %}

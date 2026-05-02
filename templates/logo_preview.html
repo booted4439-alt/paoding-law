@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Logo 字体预览</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'PingFang SC', sans-serif; background: #f5f5f5; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 40px; }
+  h1 { font-size: 24px; color: #333; }
+  .gallery { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+  .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+  .card h3 { margin-bottom: 12px; font-size: 16px; color: #666; }
+  .preview-box { width: 260px; height: 260px; display: flex; align-items: center; justify-content: center; background: repeating-conic-gradient(#e8e8e8 0% 25%, #fff 0% 50%) 0 0 / 16px 16px; border-radius: 12px; }
+  .preview-box img { max-width: 90%; max-height: 90%; }
+</style>
+</head>
+<body>
+  <h1>🔪 "丁" 字 Logo 字体测试</h1>
+  <div class="gallery">
+    <div class="card">
+      <h3>马善正 (楷书)</h3>
+      <div class="preview-box"><img src="/static/logo_test_马善政.png"></div>
+    </div>
+    <div class="card">
+      <h3>站酷仓耳渔阳体 (手写)</h3>
+      <div class="preview-box"><img src="/static/logo_test_站酷.png"></div>
+    </div>
+    <div class="card">
+      <h3>柳建毛草 (草书) - 320</h3>
+      <div class="preview-box"><img src="/static/logo_test_柳建毛草.png"></div>
+    </div>
+    <div class="card">
+      <h3>柳建毛草 (草书) - 380</h3>
+      <div class="preview-box"><img src="/static/logo_test_柳建毛草_lg.png"></div>
+    </div>
+  </div>
+</body>
+</html>

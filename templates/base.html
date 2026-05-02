@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}庖丁法律服务{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <img src="{{ url_for('static', filename='avatar.png') }}" alt="庖丁" class="nav-avatar">
+                <span>{{ get_setting('site_name') }}</span>
+            </a>
+            <div class="nav-links">
+                <a href="/consult" class="nav-link">开始咨询</a>
+                <a href="/documents" class="nav-link">法律文档</a>
+                <a href="/contact" class="nav-link">联系我们</a>
+                {% if current_user.is_authenticated %}
+                    {% if current_user.is_admin %}
+                        <a href="/admin" class="nav-link admin-link">管理后台</a>
+                    {% endif %}
+                    <a href="/auth/logout" class="nav-link nav-btn">退出</a>
+                {% else %}
+                    <a href="/auth/login" class="nav-link nav-btn">登录</a>
+                    <a href="/auth/register" class="nav-link nav-btn nav-btn-primary">注册</a>
+                {% endif %}
+            </div>
+            <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for cat, msg in messages %}
+                    <div class="flash flash-{{ cat }}">{{ msg }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-links">
+                <a href="/privacy">隐私政策</a>
+                <a href="/terms">用户协议</a>
+                <a href="/contact">联系我们</a>
+            </div>
+            <div class="footer-info">
+                <span>{{ get_setting('icp_beian') }}</span>
+                <span>{{ get_setting('police_beian') }}</span>
+                <span>&copy; 2026 {{ get_setting('site_name') }}</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Auto-dismiss flash messages
+        document.querySelectorAll('.flash').forEach(el => {
+            setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }, 3000);
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

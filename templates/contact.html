@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}联系我们 — 庖丁法律服务{% endblock %}
+{% block content %}
+<section class="contact-section">
+    <div class="contact-card">
+        <h2>联系我们</h2>
+        <div class="contact-items">
+            <div class="contact-item">
+                <span class="contact-icon">📍</span>
+                <div>
+                    <h4>地址</h4>
+                    <p>{{ get_setting('address') }}</p>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">📞</span>
+                <div>
+                    <h4>电话</h4>
+                    <p><a href="tel:{{ get_setting('phone') }}">{{ get_setting('phone') }}</a></p>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">💬</span>
+                <div>
+                    <h4>微信公众号</h4>
+                    {% if get_setting('wechat_qr') %}
+                    <img src="{{ get_setting('wechat_qr') }}" alt="公众号二维码" class="wechat-qr">
+                    {% else %}
+                    <p>请关注我们的公众号（添加中）</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
