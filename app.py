@@ -90,14 +90,14 @@ def init_db():
 @app.route('/auth/login', methods=['GET', 'POST'])
 def auth_login():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        phone = request.form.get('phone', '').strip()
         password = request.form.get('password', '')
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(phone=phone).first()
         if user and user.check_password(password):
             login_user(user)
             next_page = request.args.get('next')
             return redirect(next_page or url_for('index'))
-        flash('用户名或密码错误', 'error')
+        flash('手机号或密码错误', 'error')
     return render_template('login.html')
 
 
