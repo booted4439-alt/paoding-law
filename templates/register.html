@@ -15,7 +15,10 @@
         </div>
         <div class="form-group">
             <label>密码</label>
-            <input type="password" name="password" required minlength="6">
+            <div class="pwd-field">
+                <input type="password" name="password" id="reg-pwd" required minlength="6">
+                <button type="button" class="pwd-toggle" onclick="togglePwd('reg-pwd', this)">👁</button>
+            </div>
         </div>
         <div class="form-group">
             <label>手机号码</label>

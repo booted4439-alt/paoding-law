@@ -70,6 +70,14 @@
             setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }, 3000);
         });
         
+        // Password visibility toggle
+        function togglePwd(id, btn) {
+            const inp = document.getElementById(id);
+            const isPwd = inp.type === 'password';
+            inp.type = isPwd ? 'text' : 'password';
+            btn.textContent = isPwd ? '🙈' : '👁';
+        }
+
         // Mobile sidebar toggle (admin & docs pages)
         function toggleAdminSidebar() {
             const sidebar = document.getElementById('admin-sidebar');

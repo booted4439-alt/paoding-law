@@ -11,7 +11,10 @@
         </div>
         <div class="form-group">
             <label>密码</label>
-            <input type="password" name="password" required>
+            <div class="pwd-field">
+                <input type="password" name="password" id="login-pwd" required>
+                <button type="button" class="pwd-toggle" onclick="togglePwd('login-pwd', this)">👁</button>
+            </div>
         </div>
         <button type="submit" class="btn btn-primary btn-block">登录</button>
     </form>
