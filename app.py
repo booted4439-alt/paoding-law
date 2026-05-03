@@ -512,7 +512,7 @@ def api_document_detail(d_id):
 
 
 # ===================== ADMIN =====================
-@app.route('/admin')
+@app.route('/admin', strict_slashes=False)
 @login_required
 @admin_required
 def admin_dashboard():
