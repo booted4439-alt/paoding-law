@@ -3,15 +3,19 @@
 {% block body_class %}admin-page{% endblock %}
 {% block content %}
 <div class="admin-layout">
-    <nav class="admin-sidebar">
+    <nav class="admin-sidebar" id="admin-sidebar">
         <h3>管理后台</h3>
         <a href="/admin" class="admin-nav-link">概览</a>
         <a href="/admin/consultations" class="admin-nav-link">咨询管理</a>
         <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/users" class="admin-nav-link">用户管理</a>
         <a href="/admin/settings" class="admin-nav-link">网站设置</a>
     </nav>
     <div class="admin-main">
-        <h2>概览</h2>
+        <div class="admin-header">
+            <div class="admin-header-left"><h2>概览</h2></div>
+            <div class="admin-header-right"><a href="/" class="top-home-link">庖丁首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
+        </div>
         <div class="admin-stats" id="admin-stats">
             <div class="stat-card">
                 <div class="stat-num" id="stat-pending">-</div>
@@ -43,10 +47,10 @@ fetch('/admin/api/consultations')
         document.getElementById('stat-active').textContent = counts.active;
         document.getElementById('stat-closed').textContent = counts.closed;
     });
-fetch('/api/consultations')
+fetch('/admin/api/users')
     .then(r => r.json())
-    .then(data => {
-        // rough user count from first page total
+    .then(users => {
+        document.getElementById('stat-users').textContent = users.length;
     });
 </script>
 {% endblock %}

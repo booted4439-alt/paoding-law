@@ -3,17 +3,19 @@
 {% block body_class %}admin-page{% endblock %}
 {% block content %}
 <div class="admin-layout">
-    <nav class="admin-sidebar">
+    <nav class="admin-sidebar" id="admin-sidebar">
         <h3>管理后台</h3>
         <a href="/admin" class="admin-nav-link">概览</a>
         <a href="/admin/consultations" class="admin-nav-link">咨询管理</a>
         <a href="/admin/documents" class="admin-nav-link active">文档管理</a>
+        <a href="/admin/users" class="admin-nav-link">用户管理</a>
         <a href="/admin/settings" class="admin-nav-link">网站设置</a>
     </nav>
     <div class="admin-main">
         <div class="admin-header">
-            <h2>法律文档管理</h2>
-            <button class="btn btn-primary" onclick="showDocForm()">+ 新建文档</button>
+            <div class="admin-header-left"><h2>法律文档管理</h2>
+            <button class="btn btn-sm btn-outline" onclick="showDocForm()" style="color:var(--primary);border-color:var(--primary)">新建文档</button></div>
+            <div class="admin-header-right"><a href="/" class="top-home-link">庖丁首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
         </div>
         <div class="admin-table" id="admin-docs-table"></div>
     </div>
@@ -52,6 +54,10 @@
             <div class="form-group">
                 <label>内容 (支持 Markdown 格式)</label>
                 <textarea id="doc-content" rows="16" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>预览</label>
+                <div id="doc-preview" class="doc-preview"></div>
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">保存</button>
@@ -95,12 +101,13 @@ function showDocForm(data) {
     document.getElementById('doc-summary').value = data ? (data.summary || '') : '';
     document.getElementById('doc-content').value = data ? data.content : '';
     document.getElementById('doc-modal').style.display = 'flex';
+    setTimeout(updatePreview, 100);
 }
 
 function closeDocForm() { document.getElementById('doc-modal').style.display = 'none'; }
 
 function editDoc(id) {
-    fetch('/api/documents/' + id)
+    fetch('/admin/api/documents/' + id)
         .then(r => r.json())
         .then(d => showDocForm(d));
 }
@@ -136,6 +143,45 @@ function deleteDoc(id) {
     fetch('/admin/api/documents/' + id, { method: 'DELETE' })
         .then(() => loadDocs());
 }
+
+function renderContent(content) {
+    if (!content) return '';
+    let html = content
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Convert markdown tables to HTML tables
+    html = html.replace(/(^\|.+\|[\s\S]*?)(?=\n{2,}|$)/gm, function(block) {
+        var lines = block.trim().split('\n');
+        if (lines.length < 2) return block;
+        if (!/^\|\s*[-:]/.test(lines[1].trim())) return block;
+        var headers = lines[0].split('|').filter(function(c){return c.trim();});
+        if (!headers.length) return block;
+        var thead = '<thead><tr>' + headers.map(function(h){return '<th>'+h.trim()+'</th>';}).join('') + '</tr></thead>';
+        var tbody = '';
+        for (var i=2;i<lines.length;i++){
+            var cells = lines[i].split('|').filter(function(c){return c.trim();});
+            if (!cells.length) continue;
+            tbody += '<tr>' + cells.map(function(c){return '<td>'+c.trim()+'</td>';}).join('') + '</tr>';
+        }
+        if (!tbody) return block;
+        return '<div class="table-wrap"><table>' + thead + tbody + '</table></div>';
+    });
+    html = html
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+    return '<p>' + html + '</p>';
+}
+
+function updatePreview() {
+    const content = document.getElementById('doc-content').value;
+    const preview = document.getElementById('doc-preview');
+    preview.innerHTML = renderContent(content);
+}
+document.getElementById('doc-content').addEventListener('input', updatePreview);
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 loadDocs();

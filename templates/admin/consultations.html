@@ -3,29 +3,34 @@
 {% block body_class %}admin-page{% endblock %}
 {% block content %}
 <div class="admin-layout">
-    <nav class="admin-sidebar">
+    <nav class="admin-sidebar" id="admin-sidebar">
         <h3>管理后台</h3>
         <a href="/admin" class="admin-nav-link">概览</a>
         <a href="/admin/consultations" class="admin-nav-link active">咨询管理</a>
         <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/users" class="admin-nav-link">用户管理</a>
         <a href="/admin/settings" class="admin-nav-link">网站设置</a>
     </nav>
     <div class="admin-main">
-        <h2>咨询管理</h2>
+        <div class="admin-header">
+            <div class="admin-header-left"><h2>咨询管理</h2></div>
+            <div class="admin-header-right"><a href="/" class="top-home-link">庖丁首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
+        </div>
         <div class="admin-filters">
-            <button class="filter-btn active" onclick="adminLoadCons('')">全部</button>
-            <button class="filter-btn" onclick="adminLoadCons('pending')">待处理</button>
-            <button class="filter-btn" onclick="adminLoadCons('active')">进行中</button>
-            <button class="filter-btn" onclick="adminLoadCons('closed')">已关闭</button>
+            <button class="filter-btn" onclick="adminLoadCons('', this)">全部</button>
+            <button class="filter-btn active" onclick="adminLoadCons('pending', this)">待处理</button>
+            <button class="filter-btn" onclick="adminLoadCons('active', this)">进行中</button>
+            <button class="filter-btn" onclick="adminLoadCons('closed', this)">已关闭</button>
         </div>
         <div class="admin-table" id="admin-cons-table"></div>
     </div>
 </div>
 
 <script>
-function adminLoadCons(status) {
+function adminLoadCons(status, el) {
+    if (!el) el = document.querySelector('.admin-filters .filter-btn[onclick*="'+status+'"]') || document.querySelector('.admin-filters .filter-btn');
     document.querySelectorAll('.admin-filters .filter-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (el) el.classList.add('active');
     fetch('/admin/api/consultations?status=' + status)
         .then(r => r.json())
         .then(data => {
@@ -49,6 +54,6 @@ function adminLoadCons(status) {
 }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 function statusLabel(s) { return {'pending':'待处理','active':'进行中','closed':'已关闭'}[s]||s; }
-adminLoadCons('');
+adminLoadCons('pending');
 </script>
 {% endblock %}

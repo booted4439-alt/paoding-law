@@ -8,10 +8,14 @@ from flask import (Flask, render_template, request, redirect, url_for,
 from flask_login import (LoginManager, login_user, logout_user,
                          login_required, current_user)
 from flask_socketio import SocketIO, join_room, emit
+import pymysql
+pymysql.install_as_MySQLdb()
+
 from werkzeug.utils import secure_filename
 
 from config import Config
 from models import db, User, Consultation, Message, LegalDocument, SiteSetting
+from services.sms import send_sms_code, check_sms_code, generate_code
 
 # ---------- app init ----------
 app = Flask(__name__)
@@ -101,12 +105,27 @@ def auth_register():
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
+        phone = request.form.get('phone', '').strip()
+        sms_code = request.form.get('sms_code', '').strip()
+
+        # 核验短信验证码
+        if phone and sms_code:
+            verify_result = check_sms_code(phone, sms_code)
+            if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
+                flash('短信验证码错误或已过期', 'error')
+                return render_template('register.html')
+        else:
+            flash('请完成手机验证', 'error')
+            return render_template('register.html')
+
         if User.query.filter_by(username=username).first():
             flash('用户名已存在', 'error')
         elif User.query.filter_by(email=email).first():
             flash('邮箱已注册', 'error')
+        elif User.query.filter_by(phone=phone).first():
+            flash('该手机号已注册', 'error')
         else:
-            user = User(username=username, email=email)
+            user = User(username=username, email=email, phone=phone)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
@@ -122,6 +141,39 @@ def auth_logout():
     return redirect(url_for('index'))
 
 
+# ===================== SMS VERIFICATION =====================
+@app.route('/api/sms/send', methods=['POST'])
+def sms_send():
+    """发送短信验证码"""
+    data = request.get_json() or {}
+    phone = data.get('phone', '').strip()
+    if not phone or not phone.isdigit() or len(phone) != 11:
+        return jsonify({'success': False, 'message': '请输入正确的手机号码'}), 400
+
+    result = send_sms_code(phone)
+    if result.get('success'):
+        return jsonify({'success': True, 'message': '验证码已发送'})
+    else:
+        return jsonify({'success': False, 'message': result.get('message', '发送失败')}), 500
+
+
+@app.route('/api/sms/verify', methods=['POST'])
+def sms_verify():
+    """核验短信验证码"""
+    data = request.get_json() or {}
+    phone = data.get('phone', '').strip()
+    code = data.get('code', '').strip()
+    if not phone or not code:
+        return jsonify({'success': False, 'message': '参数不完整'}), 400
+
+    result = check_sms_code(phone, code)
+    if result.get('success') and result.get('verify_result') == 'PASS':
+        return jsonify({'success': True, 'message': '验证通过'})
+    else:
+        return jsonify({'success': False, 'message': '验证码错误或已过期'}), 400
+
+
+# ===================== WECHAT LOGIN =====================
 # ===================== PAGES =====================
 @app.route('/logo-preview')
 def logo_preview():
@@ -152,6 +204,7 @@ def contact():
 
 # ===================== CONSULTATION =====================
 @app.route('/consult')
+@login_required
 def consult_page():
     return render_template('consult.html')
 
@@ -161,11 +214,24 @@ def consult_page():
 def list_consultations():
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
-    q = Consultation.query.filter_by(user_id=current_user.id)
+    q = request.args.get('q', '').strip()
+    query = Consultation.query.filter_by(user_id=current_user.id)
     if status:
-        q = q.filter_by(status=status)
-    q = q.order_by(Consultation.updated_at.desc())
-    pagination = q.paginate(page=page, per_page=Config.ITEMS_PER_PAGE, error_out=False)
+        query = query.filter_by(status=status)
+    if q:
+        # Search by title or message content
+        query = query.filter(
+            db.or_(
+                Consultation.title.contains(q),
+                Consultation.id.in_(
+                    db.session.query(Message.consultation_id).filter(
+                        Message.content.contains(q)
+                    )
+                )
+            )
+        )
+    query = query.order_by(Consultation.updated_at.desc())
+    pagination = query.paginate(page=page, per_page=Config.ITEMS_PER_PAGE, error_out=False)
     return jsonify({
         'consultations': [{
             'id': c.id,
@@ -196,18 +262,90 @@ def create_consultation():
     return jsonify({'id': c.id, 'title': c.title}), 201
 
 
+@app.route('/api/consultations/with-message', methods=['POST'])
+@login_required
+def create_consultation_with_message():
+    """Create a consultation with the first message (and optionally files) in one call."""
+    content = (request.form.get('content') or '').strip()
+    title = (request.form.get('title') or '').strip()
+    if not title:
+        title = content[:50] if content else '法律咨询'
+    if not content:
+        return jsonify({'error': '请输入您的问题'}), 400
+
+    # Validate limits
+    files = request.files.getlist('file')
+    err = check_message_limits(content, files)
+    if err:
+        return jsonify({'error': err}), 400
+
+    c = Consultation(title=title, description=content, user_id=current_user.id)
+    db.session.add(c)
+    db.session.flush()
+
+    # Create message for content
+    if content:
+        msg = Message(consultation_id=c.id, sender_id=current_user.id, content=content)
+        db.session.add(msg)
+
+    # Create messages for each file
+    for f in files:
+        result = save_uploaded_file(f)
+        if result:
+            file_url, file_type = result
+            msg = Message(consultation_id=c.id, sender_id=current_user.id,
+                          file_url=file_url, file_type=file_type,
+                          content=f'[文件] {f.filename}')
+            db.session.add(msg)
+
+    c.status = 'active'
+    c.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    # broadcast
+    msgs = Message.query.filter_by(consultation_id=c.id).order_by(Message.created_at.asc()).all()
+    for m in msgs:
+        socketio.emit('new_message', {
+            'consultation_id': c.id,
+            'message': {
+                'id': m.id,
+                'sender': current_user.username,
+                'sender_id': current_user.id,
+                'content': m.content,
+                'file_url': m.file_url,
+                'file_type': m.file_type,
+                'is_system': False,
+                'created_at': m.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+        }, room=f'consult_{c.id}')
+
+    return jsonify({'id': c.id, 'title': c.title}), 201
+
+
 @app.route('/api/consultations/<int:c_id>', methods=['DELETE'])
 @login_required
 def delete_consultation(c_id):
     c = db.session.get(Consultation, c_id)
-    if not c or c.user_id != current_user.id:
+    if not c or (c.user_id != current_user.id and not current_user.is_admin):
         return jsonify({'error': '未找到咨询'}), 404
-    if c.status != 'pending':
-        return jsonify({'error': '只能删除待处理的咨询'}), 400
     Message.query.filter_by(consultation_id=c.id).delete()
     db.session.delete(c)
     db.session.commit()
     return jsonify({'ok': True})
+
+
+@app.route('/api/consultations/<int:c_id>/close', methods=['POST'])
+@login_required
+def close_consultation(c_id):
+    c = db.session.get(Consultation, c_id)
+    if not c or (c.user_id != current_user.id and not current_user.is_admin):
+        return jsonify({'error': '未找到咨询'}), 404
+    if c.status == 'closed':
+        return jsonify({'error': '咨询已关闭'}), 400
+    c.status = 'closed'
+    c.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({'ok': True, 'status': 'closed'})
 
 
 @app.route('/api/consultations/<int:c_id>/messages', methods=['GET'])
@@ -229,6 +367,34 @@ def get_messages(c_id):
     } for m in msgs])
 
 
+def check_message_limits(content, files):
+    """Validate message content and file limits."""
+    if len(content) > 6000:
+        return '内容不能超过6000个字符'
+    files_list = [f for f in files if f and f.filename]
+    if len(files_list) > 50:
+        return '附件不能超过50个'
+    for f in files_list:
+        f.seek(0, 2)  # seek to end
+        size = f.tell()
+        f.seek(0)  # seek back
+        if size > 100 * 1024 * 1024:
+            return f'附件 {f.filename} 超过100MB限制'
+    return None
+
+
+def save_uploaded_file(f):
+    """Save a single uploaded file, return (url, type) or None."""
+    if not f or not f.filename:
+        return None
+    if not allowed_file(f.filename):
+        return None
+    ext = f.filename.rsplit('.', 1)[1].lower()
+    filename = f'{uuid.uuid4().hex}.{ext}'
+    f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return url_for('uploaded_file', filename=filename), ext
+
+
 @app.route('/api/consultations/<int:c_id>/messages', methods=['POST'])
 @login_required
 def send_message(c_id):
@@ -236,41 +402,54 @@ def send_message(c_id):
     if not c or (c.user_id != current_user.id and not current_user.is_lawyer):
         return jsonify({'error': '无权限'}), 403
     content = (request.form.get('content') or '').strip()
-    file_url = None
-    file_type = None
-    if 'file' in request.files:
-        f = request.files['file']
-        if f and f.filename and allowed_file(f.filename):
-            ext = f.filename.rsplit('.', 1)[1].lower()
-            filename = f'{uuid.uuid4().hex}.{ext}'
-            f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            file_url = url_for('uploaded_file', filename=filename)
-            file_type = ext
-    if not content and not file_url:
+    files = request.files.getlist('file')
+
+    # Validate limits
+    err = check_message_limits(content, files)
+    if err:
+        return jsonify({'error': err}), 400
+
+    if not content and not any(f.filename for f in files if f):
         return jsonify({'error': '请输入内容或上传文件'}), 400
-    msg = Message(consultation_id=c_id, sender_id=current_user.id,
-                  content=content, file_url=file_url, file_type=file_type)
-    db.session.add(msg)
+
+    # Create message for text content
+    if content:
+        msg = Message(consultation_id=c_id, sender_id=current_user.id, content=content)
+        db.session.add(msg)
+
+    # Create messages for each file
+    for f in files:
+        result = save_uploaded_file(f)
+        if result:
+            file_url, file_type = result
+            msg = Message(consultation_id=c_id, sender_id=current_user.id,
+                          file_url=file_url, file_type=file_type,
+                          content=f'[文件] {f.filename}')
+            db.session.add(msg)
+
     if c.status == 'pending':
         c.status = 'active'
     c.updated_at = datetime.now(timezone.utc)
     db.session.commit()
 
-    # real-time broadcast
-    socketio.emit('new_message', {
-        'consultation_id': c_id,
-        'message': {
-            'id': msg.id,
-            'sender': current_user.username,
-            'sender_id': current_user.id,
-            'content': msg.content,
-            'file_url': msg.file_url,
-            'file_type': msg.file_type,
-            'is_system': False,
-            'created_at': msg.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-        }
-    }, room=f'consult_{c_id}')
-    return jsonify({'ok': True, 'message_id': msg.id}), 201
+    # real-time broadcast all new messages
+    new_msgs = Message.query.filter_by(consultation_id=c_id).order_by(Message.id.desc()).limit(len(files) + (1 if content else 0)).all()
+    for m in reversed(new_msgs):
+        socketio.emit('new_message', {
+            'consultation_id': c_id,
+            'message': {
+                'id': m.id,
+                'sender': current_user.username,
+                'sender_id': current_user.id,
+                'content': m.content,
+                'file_url': m.file_url,
+                'file_type': m.file_type,
+                'is_system': False,
+                'created_at': m.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+        }, room=f'consult_{c_id}')
+
+    return jsonify({'ok': True}), 201
 
 
 @app.route('/uploads/<filename>')
@@ -312,11 +491,22 @@ def api_document_detail(d_id):
     d = db.session.get(LegalDocument, d_id)
     if not d or not d.is_published:
         return jsonify({'error': '文档未找到'}), 404
+
+    # Render markdown to HTML on the server side
+    rendered = d.content
+    try:
+        import markdown
+        rendered = markdown.markdown(d.content, extensions=['extra', 'sane_lists'])
+    except Exception:
+        # fallback: simple line break conversion
+        rendered = d.content.replace('\n', '<br>')
+
     return jsonify({
         'id': d.id,
         'title': d.title,
         'category': d.category,
         'content': d.content,
+        'rendered': rendered,
         'updated_at': d.updated_at.strftime('%Y-%m-%d'),
     })
 
@@ -408,6 +598,24 @@ def admin_list_documents():
     } for d in q])
 
 
+@app.route('/admin/api/documents/<int:d_id>', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_document(d_id):
+    d = db.session.get(LegalDocument, d_id)
+    if not d:
+        return jsonify({'error': '未找到'}), 404
+    return jsonify({
+        'id': d.id,
+        'title': d.title,
+        'category': d.category,
+        'content': d.content,
+        'summary': d.summary,
+        'is_published': d.is_published,
+        'updated_at': d.updated_at.strftime('%Y-%m-%d'),
+    })
+
+
 @app.route('/admin/api/documents', methods=['POST'])
 @login_required
 @admin_required
@@ -477,6 +685,110 @@ def admin_save_settings():
     data = request.get_json() or {}
     for k, v in data.items():
         SiteSetting.set(k, v)
+    return jsonify({'ok': True})
+
+
+# ===================== ADMIN: USER MANAGEMENT =====================
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    return render_template('admin/users.html')
+
+
+@app.route('/admin/api/users', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_users():
+    q = User.query.order_by(User.created_at.desc()).all()
+    return jsonify([{
+        'id': u.id,
+        'username': u.username,
+        'email': u.email,
+        'phone': u.phone or '',
+        'is_admin': u.is_admin,
+        'is_lawyer': u.is_lawyer,
+        'created_at': u.created_at.strftime('%Y-%m-%d %H:%M'),
+    } for u in q])
+
+
+@app.route('/admin/api/users', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_user():
+    data = request.get_json() or {}
+    username = data.get('username', '').strip()
+    email = data.get('email', '').strip()
+    password = data.get('password', '')
+    phone = data.get('phone', '').strip() or None
+    is_admin = data.get('is_admin', False)
+    is_lawyer = data.get('is_lawyer', False)
+
+    if not username or not email or not password:
+        return jsonify({'error': '用户名、邮箱、密码为必填'}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({'error': '用户名已存在'}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': '邮箱已注册'}), 400
+    if phone and User.query.filter_by(phone=phone).first():
+        return jsonify({'error': '手机号已注册'}), 400
+
+    user = User(username=username, email=email, phone=phone,
+                is_admin=is_admin, is_lawyer=is_lawyer)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': user.id}), 201
+
+
+@app.route('/admin/api/users/<int:u_id>', methods=['PUT'])
+@login_required
+@admin_required
+def admin_update_user(u_id):
+    user = db.session.get(User, u_id)
+    if not user:
+        return jsonify({'error': '用户未找到'}), 404
+
+    data = request.get_json() or {}
+    if 'username' in data and data['username'].strip():
+        u = User.query.filter_by(username=data['username'].strip()).first()
+        if u and u.id != user.id:
+            return jsonify({'error': '用户名已存在'}), 400
+        user.username = data['username'].strip()
+    if 'email' in data and data['email'].strip():
+        u = User.query.filter_by(email=data['email'].strip()).first()
+        if u and u.id != user.id:
+            return jsonify({'error': '邮箱已注册'}), 400
+        user.email = data['email'].strip()
+    if 'phone' in data:
+        p = data['phone'].strip() or None
+        if p:
+            u = User.query.filter_by(phone=p).first()
+            if u and u.id != user.id:
+                return jsonify({'error': '手机号已注册'}), 400
+        user.phone = p
+    if 'password' in data and data['password']:
+        user.set_password(data['password'])
+    if 'is_admin' in data:
+        user.is_admin = bool(data['is_admin'])
+    if 'is_lawyer' in data:
+        user.is_lawyer = bool(data['is_lawyer'])
+
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/users/<int:u_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(u_id):
+    if u_id == current_user.id:
+        return jsonify({'error': '不能删除自己'}), 400
+    user = db.session.get(User, u_id)
+    if not user:
+        return jsonify({'error': '用户未找到'}), 404
+    db.session.delete(user)
+    db.session.commit()
     return jsonify({'ok': True})
 
 

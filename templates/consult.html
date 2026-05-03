@@ -1,39 +1,73 @@
 {% extends "base.html" %}
 {% block title %}开始咨询 — 庖丁法律服务{% endblock %}
 {% block body_class %}chat-page{% endblock %}
+{% block nav_class %}nav-hidden{% endblock %}
+{% block footer_class %}footer-hidden{% endblock %}
+{% block main_class %}main-full{% endblock %}
 {% block content %}
-<div class="consult-layout">
+<div class="consult-layout" id="consult-layout">
     <!-- Sidebar -->
-    <aside class="consult-sidebar">
+    <aside class="consult-sidebar" id="consult-sidebar">
         <div class="sidebar-header">
-            <h2>我的咨询</h2>
-            <button class="btn btn-sm btn-primary" onclick="newConsultation()">+ 新咨询</button>
+            <div class="sidebar-header-top">
+                <h2>咨询记录</h2>
+                <button class="btn btn-sm btn-primary new-chat-btn" onclick="startNewChat()">＋ 新对话</button>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" id="sidebar-search-input" placeholder="搜索咨询..." oninput="searchConsultations(this.value)">
+            </div>
         </div>
-        <div class="sidebar-filters">
-            <button class="filter-btn active" data-filter="" onclick="loadConsultations('')">全部</button>
-            <button class="filter-btn" data-filter="pending" onclick="loadConsultations('pending')">待处理</button>
-            <button class="filter-btn" data-filter="active" onclick="loadConsultations('active')">进行中</button>
-            <button class="filter-btn" data-filter="closed" onclick="loadConsultations('closed')">已关闭</button>
+        <div class="sidebar-list" id="consult-list">
+            <div class="sidebar-loading">加载中...</div>
         </div>
-        <div class="sidebar-list" id="consult-list"></div>
+
     </aside>
 
-    <!-- Chat Area -->
+    <!-- Main Chat Area -->
     <div class="consult-main">
-        <div class="chat-placeholder" id="chat-placeholder">
-            <div class="placeholder-icon">💬</div>
-            <h3>选择一个咨询开始对话</h3>
-            <p>或点击"新咨询"发起法律咨询</p>
+        <!-- Empty state (no chat selected) -->
+        <div class="chat-empty" id="chat-empty">
+            <div class="chat-empty-top-bar">
+                <a href="/" class="home-link">庖丁首页</a>
+                <button class="sidebar-toggle" id="empty-sidebar-toggle" onclick="toggleSidebar()" title="咨询记录">☰</button>
+            </div>
+            <div class="chat-empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+            <h3>有什么法律问题需要帮助？</h3>
+            <p class="chat-empty-desc">直接输入您的问题，开始法律咨询</p>
+            <div class="chat-empty-input">
+                <form onsubmit="return submitFirstMessage(event)">
+                    <textarea id="first-message-input" rows="1" placeholder="输入您的问题，支持上传文件..." oninput="autoResize(this)" onkeydown="onFirstInputKeydown(event)"></textarea>
+                    <button type="button" class="upload-btn" onclick="document.getElementById('first-file-input').click()">📎</button>
+                    <input type="file" id="first-file-input" multiple style="display:none" onchange="handleFirstFiles(this.files)">
+                    <button type="submit" class="send-btn">发送</button>
+                </form>
+                <div class="file-previews" id="first-file-previews"></div>
+            </div>
+            <div class="msg-hint" id="first-msg-hint" style="font-size:0.78rem;color:var(--text-muted);text-align:right;max-width:560px;width:100%;padding-right:4px"></div>
+            <div class="chat-empty-hints">
+                <button class="hint-btn" onclick="quickStart('我想咨询离婚纠纷问题')">离婚纠纷</button>
+                <button class="hint-btn" onclick="quickStart('我想咨询民间借贷问题')">民间借贷</button>
+                <button class="hint-btn" onclick="quickStart('我想咨询劳动纠纷问题')">劳动纠纷</button>
+                <button class="hint-btn" onclick="quickStart('我想咨询合同纠纷问题')">合同纠纷</button>
+            </div>
         </div>
+
+        <!-- Active chat -->
         <div class="chat-container" id="chat-container" style="display:none">
             <div class="chat-header" id="chat-header">
-                <div>
+                <div class="chat-header-title-row">
                     <h3 id="chat-title"></h3>
                     <span class="chat-status" id="chat-status"></span>
                 </div>
                 <div class="chat-header-actions">
-                    <button class="btn btn-sm btn-outline" onclick="closeConsultation()">关闭</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteConsultation()">删除</button>
+                    <a href="/" class="btn btn-sm btn-outline home-nav-btn">庖丁首页</a>
+                    <button class="sidebar-toggle" id="active-sidebar-toggle" onclick="toggleSidebar()" title="咨询记录">☰</button>
+                    <button class="btn btn-sm btn-outline" onclick="closeCurrentChat()">关闭</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCurrentChat()">删除</button>
                 </div>
             </div>
             <div class="chat-messages" id="chat-messages"></div>
@@ -41,33 +75,13 @@
                 <form id="message-form" onsubmit="return sendMessage(event)">
                     <button type="button" class="upload-btn" onclick="document.getElementById('file-input').click()" title="上传文件">📎</button>
                     <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this.files)">
-                    <div class="file-previews" id="file-previews"></div>
-                    <textarea id="message-input" rows="1" placeholder="输入您的问题..." oninput="autoResize(this)"></textarea>
+                    <textarea id="message-input" rows="1" placeholder="输入您的问题..." oninput="autoResize(this)" onkeydown="onMsgInputKeydown(event)"></textarea>
                     <button type="submit" class="send-btn">发送</button>
+                    <div class="file-previews" id="file-previews"></div>
                 </form>
+                <div class="msg-hint" id="msg-hint" style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;text-align:right"></div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- New Consultation Modal -->
-<div class="modal" id="new-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>发起新咨询</h3>
-            <button class="modal-close" onclick="closeModal('new-modal')">&times;</button>
-        </div>
-        <form onsubmit="return submitConsultation(event)">
-            <div class="form-group">
-                <label>咨询标题</label>
-                <input type="text" id="consult-title" required placeholder="例如：合同审核、劳动纠纷...">
-            </div>
-            <div class="form-group">
-                <label>问题描述</label>
-                <textarea id="consult-desc" rows="4" placeholder="请详细描述您遇到的法律问题..."></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block">提交咨询</button>
-        </form>
     </div>
 </div>
 
@@ -76,32 +90,83 @@
 let currentConsultationId = null;
 let socket = null;
 let uploadedFiles = [];
-let currentFilter = '';
 
+// ========== Sidebar Logic ==========
+// Desktop: visible by default, toggle hides/shows
+// Mobile (< 769px): hidden by default, toggle overlay
+let sidebarDesktopVisible = true;
+
+function initSidebar() {
+    const isMobile = window.innerWidth <= 768;
+    const sidebar = document.getElementById('consult-sidebar');
+    if (isMobile) {
+        sidebar.classList.remove('open');
+    } else {
+        sidebar.classList.toggle('open', sidebarDesktopVisible);
+    }
+}
+
+function toggleSidebar() {
+    const isMobile = window.innerWidth <= 768;
+    const sidebar = document.getElementById('consult-sidebar');
+    if (isMobile) {
+        sidebar.classList.toggle('open');
+    } else {
+        sidebarDesktopVisible = !sidebarDesktopVisible;
+        sidebar.classList.toggle('open', sidebarDesktopVisible);
+    }
+}
+
+// Handle window resize
+let resizeTimer;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(initSidebar, 150);
+});
+
+// ========== Init Socket ==========
 function initSocket(cid) {
     if (socket) socket.disconnect();
     socket = io();
     socket.emit('join', { consultation_id: cid });
     socket.on('new_message', function(data) {
         if (data.consultation_id == currentConsultationId) {
-            appendMessage(data.message);
+            appendMessage(data.message, data.message.sender_id);
         }
-        loadConsultations(currentFilter);
+        loadConsultations();
     });
 }
 
-function loadConsultations(filter) {
-    currentFilter = filter;
-    document.querySelectorAll('.filter-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.filter === filter);
-    });
-    fetch('/api/consultations?status=' + filter)
+// ========== Load Chat List ==========
+let searchTimer = null;
+function searchConsultations(q) {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() {
+        fetch('/api/consultations?status=&q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                renderConsultList(data.consultations);
+            });
+    }, 300);
+}
+
+function loadConsultations() {
+    fetch('/api/consultations?status=')
         .then(r => r.json())
         .then(data => {
-            const list = document.getElementById('consult-list');
-            list.innerHTML = data.consultations.map(c => `
+            renderConsultList(data.consultations);
+        });
+}
+
+function renderConsultList(consultations) {
+    const list = document.getElementById('consult-list');
+    if (!consultations || consultations.length === 0) {
+        list.innerHTML = '<div class="sidebar-empty">暂无咨询记录</div>';
+        return;
+    }
+    list.innerHTML = consultations.map(c => `
                 <div class="consult-item ${c.id === currentConsultationId ? 'active' : ''}"
-                     onclick="openConsultation(${c.id})">
+                     onclick="openChat(${c.id})">
                     <div class="consult-item-title">${escHtml(c.title)}</div>
                     <div class="consult-item-meta">
                         <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
@@ -109,23 +174,27 @@ function loadConsultations(filter) {
                     </div>
                 </div>
             `).join('');
-        });
 }
 
-function openConsultation(id) {
+// ========== Open Chat ==========
+function openChat(id) {
     currentConsultationId = id;
     initSocket(id);
-    document.getElementById('chat-placeholder').style.display = 'none';
-    document.getElementById('chat-container').style.display = 'flex';
+    document.getElementById('chat-empty').style.display = 'none';
+    const container = document.getElementById('chat-container');
+    container.style.display = 'flex';
+
+    // Load messages
     fetch('/api/consultations/' + id + '/messages')
         .then(r => r.json())
         .then(msgs => {
-            const container = document.getElementById('chat-messages');
-            container.innerHTML = '';
-            msgs.forEach(m => appendMessage(m));
-            container.scrollTop = container.scrollHeight;
+            const msgContainer = document.getElementById('chat-messages');
+            msgContainer.innerHTML = '';
+            msgs.forEach(m => appendMessage(m, m.sender_id));
+            scrollToBottom();
         });
-    // update header
+
+    // Update header
     fetch('/api/consultations?status=')
         .then(r => r.json())
         .then(data => {
@@ -135,38 +204,67 @@ function openConsultation(id) {
                 document.getElementById('chat-status').textContent = statusLabel(c.status);
             }
         });
-    document.querySelectorAll('.consult-item').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.consult-item:nth-child(${id})`)?.classList.add('active');
+
+    // On mobile, close sidebar
+    if (window.innerWidth <= 768) {
+        document.getElementById('consult-sidebar').classList.remove('open');
+    }
+
+    loadConsultations();
 }
 
-function appendMessage(m) {
+// ========== Append Message ==========
+function appendMessage(m, senderId) {
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
-    div.className = 'message ' + (m.sender_id === {{ current_user.id if current_user.is_authenticated else '0' }} ? 'message-self' : 'message-other');
+    const isSelf = parseInt(senderId) === {{ current_user.id if current_user.is_authenticated else 0 }};
+    div.className = 'message ' + (isSelf ? 'message-self' : 'message-other');
     let html = `<div class="message-sender">${escHtml(m.sender)}</div>`;
-    if (m.content) html += `<div class="message-content">${escHtml(m.content)}</div>`;
+    if (m.content && !m.content.startsWith('[文件]')) {
+        html += `<div class="message-content">${linkify(escHtml(m.content))}</div>`;
+    }
     if (m.file_url) {
-        const isImg = ['png','jpg','jpeg','gif','webp','bmp'].includes(m.file_type);
-        if (isImg) html += `<div class="message-file"><img src="${m.file_url}" class="msg-img"></div>`;
-        else html += `<div class="message-file"><a href="${m.file_url}" target="_blank">📎 下载文件</a></div>`;
+        const ext = (m.file_type || '').toLowerCase();
+        const isImg = ['png','jpg','jpeg','gif','webp','bmp'].includes(ext);
+        if (isImg) {
+            html += `<div class="message-file"><img src="${m.file_url}" class="msg-img" onclick="window.open('${m.file_url}','_blank')"></div>`;
+        } else {
+            html += `<div class="message-file"><a href="${m.file_url}" target="_blank" class="file-link">📎 ${escHtml(m.content && m.content.startsWith('[文件]') ? m.content.replace('[文件] ','') : '下载文件')}</a></div>`;
+        }
     }
     html += `<div class="message-time">${m.created_at}</div>`;
     div.innerHTML = html;
     container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+    scrollToBottom();
 }
 
+function scrollToBottom() {
+    const container = document.getElementById('chat-messages');
+    setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+// ========== Send Message (existing chat) ==========
 function sendMessage(e) {
     e.preventDefault();
     const input = document.getElementById('message-input');
     const content = input.value.trim();
     if (!content && uploadedFiles.length === 0) return false;
+    
+    // Client-side validation
+    if (content.length > 6000) { alert('内容不能超过6000个字符'); return false; }
+    if (uploadedFiles.length > 50) { alert('附件不能超过50个'); return false; }
+    for (var i = 0; i < uploadedFiles.length; i++) {
+        if (uploadedFiles[i].size > 100 * 1024 * 1024) {
+            alert('附件 ' + uploadedFiles[i].name + ' 超过100MB限制'); return false;
+        }
+    }
 
     const formData = new FormData();
     formData.append('content', content);
     for (const f of uploadedFiles) {
         formData.append('file', f);
     }
+
     fetch('/api/consultations/' + currentConsultationId + '/messages', { method: 'POST', body: formData })
         .then(r => r.json())
         .then(data => {
@@ -174,61 +272,188 @@ function sendMessage(e) {
                 input.value = '';
                 uploadedFiles = [];
                 document.getElementById('file-previews').innerHTML = '';
-                loadConsultations(currentFilter);
+                input.style.height = 'auto';
+                loadConsultations();
+            } else if (data.error) {
+                alert(data.error);
             }
         });
     return false;
 }
 
+function onMsgInputKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('message-form').dispatchEvent(new Event('submit'));
+    }
+}
+
+function onFirstInputKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitFirstMessage(e);
+    }
+}
+
+// ========== File handling (existing chat) ==========
 function handleFiles(files) {
     for (const f of files) uploadedFiles.push(f);
-    const previews = document.getElementById('file-previews');
-    previews.innerHTML = uploadedFiles.map((f, i) =>
-        `<span class="file-tag">📎 ${escHtml(f.name)} <button onclick="removeFile(${i})">&times;</button></span>`
+    renderFilePreviews('file-previews', uploadedFiles);
+    updateMsgHint();
+}
+
+function removeFile(index) {
+    uploadedFiles.splice(index, 1);
+    renderFilePreviews('file-previews', uploadedFiles);
+    updateMsgHint();
+}
+
+function renderFilePreviews(containerId, files) {
+    const previews = document.getElementById(containerId);
+    if (!previews) return;
+    previews.innerHTML = files.map((f, i) =>
+        `<span class="file-tag">📎 ${escHtml(f.name)} <button onclick="removeFile(${i})" class="file-remove">&times;</button></span>`
     ).join('');
 }
 
-function removeFile(i) { uploadedFiles.splice(i, 1); handleFiles([]); }
+function updateMsgHint() {
+    const hint = document.getElementById('msg-hint');
+    if (!hint) return;
+    var parts = [];
+    if (uploadedFiles.length > 0) parts.push(uploadedFiles.length + '/50 个附件');
+    var totalSize = 0;
+    for (var i = 0; i < uploadedFiles.length; i++) totalSize += uploadedFiles[i].size;
+    if (totalSize > 0) parts.push('共 ' + (totalSize / 1024 / 1024).toFixed(1) + 'MB');
+    hint.textContent = parts.join(' | ');
+}
 
-function newConsultation() { document.getElementById('new-modal').style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+// ========== First Message / New Chat ==========
+let firstUploadedFiles = [];
 
-function submitConsultation(e) {
+function startNewChat() {
+    document.getElementById('chat-container').style.display = 'none';
+    document.getElementById('chat-empty').style.display = 'flex';
+    currentConsultationId = null;
+    if (socket) socket.disconnect();
+    document.getElementById('first-message-input').value = '';
+    firstUploadedFiles = [];
+    document.getElementById('first-file-previews').innerHTML = '';
+    // On mobile, close sidebar
+    if (window.innerWidth <= 768) {
+        document.getElementById('consult-sidebar').classList.remove('open');
+    }
+}
+
+function handleFirstFiles(files) {
+    for (const f of files) firstUploadedFiles.push(f);
+    const previews = document.getElementById('first-file-previews');
+    previews.innerHTML = firstUploadedFiles.map((f, i) =>
+        `<span class="file-tag">📎 ${escHtml(f.name)} <button onclick="removeFirstFile(${i})" class="file-remove">&times;</button></span>`
+    ).join('');
+    updateFirstMsgHint();
+}
+
+function removeFirstFile(index) {
+    firstUploadedFiles.splice(index, 1);
+    const previews = document.getElementById('first-file-previews');
+    previews.innerHTML = firstUploadedFiles.map((f, i) =>
+        `<span class="file-tag">📎 ${escHtml(f.name)} <button onclick="removeFirstFile(${i})" class="file-remove">&times;</button></span>`
+    ).join('');
+    updateFirstMsgHint();
+}
+
+function updateFirstMsgHint() {
+    const hint = document.getElementById('first-msg-hint');
+    if (!hint) return;
+    var parts = [];
+    if (firstUploadedFiles.length > 0) parts.push(firstUploadedFiles.length + '/50 个附件');
+    var totalSize = 0;
+    for (var i = 0; i < firstUploadedFiles.length; i++) totalSize += firstUploadedFiles[i].size;
+    if (totalSize > 0) parts.push('共 ' + (totalSize / 1024 / 1024).toFixed(1) + 'MB');
+    hint.textContent = parts.join(' | ');
+}
+
+function submitFirstMessage(e) {
     e.preventDefault();
-    const title = document.getElementById('consult-title').value.trim();
-    const desc = document.getElementById('consult-desc').value.trim();
-    fetch('/api/consultations', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title, description: desc})
-    }).then(r => r.json()).then(data => {
-        if (data.id) {
-            closeModal('new-modal');
-            document.getElementById('consult-title').value = '';
-            document.getElementById('consult-desc').value = '';
-            loadConsultations(currentFilter);
-            openConsultation(data.id);
+    const input = document.getElementById('first-message-input');
+    const content = input.value.trim();
+    if (!content && firstUploadedFiles.length === 0) return false;
+    
+    // Client-side validation
+    if (content.length > 6000) { alert('内容不能超过6000个字符'); return false; }
+    if (firstUploadedFiles.length > 50) { alert('附件不能超过50个'); return false; }
+    for (var i = 0; i < firstUploadedFiles.length; i++) {
+        if (firstUploadedFiles[i].size > 100 * 1024 * 1024) {
+            alert('附件 ' + firstUploadedFiles[i].name + ' 超过100MB限制'); return false;
         }
-    });
+    }
+
+    const formData = new FormData();
+    formData.append('content', content);
+    for (const f of firstUploadedFiles) {
+        formData.append('file', f);
+    }
+
+    fetch('/api/consultations/with-message', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.id) {
+                input.value = '';
+                firstUploadedFiles = [];
+                document.getElementById('first-file-previews').innerHTML = '';
+                input.style.height = 'auto';
+                loadConsultations();
+                openChat(data.id);
+            } else if (data.error) {
+                alert(data.error);
+            }
+        })
+        .catch(() => alert('发送失败，请重试'));
     return false;
 }
 
-function closeConsultation() {
+function quickStart(text) {
+    document.getElementById('first-message-input').value = text;
+    document.getElementById('first-message-input').style.height = 'auto';
+    document.getElementById('first-message-input').style.height = Math.min(document.getElementById('first-message-input').scrollHeight, 150) + 'px';
+    document.getElementById('first-message-input').focus();
+}
+
+// ========== Close / Delete ==========
+function closeChat() {
     currentConsultationId = null;
-    document.getElementById('chat-placeholder').style.display = 'flex';
     document.getElementById('chat-container').style.display = 'none';
+    document.getElementById('chat-empty').style.display = 'flex';
     if (socket) socket.disconnect();
 }
 
-function deleteConsultation() {
-    if (!currentConsultationId || !confirm('确定删除此咨询？')) return;
-    fetch('/api/consultations/' + currentConsultationId, { method: 'DELETE' })
-        .then(r => r.json()).then(() => {
-            closeConsultation();
-            loadConsultations(currentFilter);
+function closeCurrentChat() {
+    if (!currentConsultationId || !confirm('确定关闭此咨询？关闭后如需继续请重新发起咨询。')) return;
+    fetch('/api/consultations/' + currentConsultationId + '/close', { method: 'POST' })
+        .then(r => r.json()).then(data => {
+            if (data.ok) {
+                closeChat();
+                loadConsultations();
+            } else if (data.error) {
+                alert(data.error);
+            }
         });
 }
 
+function deleteCurrentChat() {
+    if (!currentConsultationId || !confirm('确定删除此咨询？')) return;
+    fetch('/api/consultations/' + currentConsultationId, { method: 'DELETE' })
+        .then(r => r.json()).then(data => {
+            if (data.ok) {
+                closeChat();
+                loadConsultations();
+            } else if (data.error) {
+                alert(data.error);
+            }
+        });
+}
+
+// ========== Utilities ==========
 function statusLabel(s) {
     return {'pending':'待处理','active':'进行中','closed':'已关闭'}[s] || s;
 }
@@ -239,12 +464,31 @@ function escHtml(s) {
     return d.innerHTML;
 }
 
+function linkify(text) {
+    return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+
 function autoResize(el) {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 150) + 'px';
 }
 
-// Init
-loadConsultations('');
+// ========== Auto-close sidebar when clicking outside (mobile) ==========
+function closeConsultSidebarOnOutsideClick(e) {
+    if (window.innerWidth > 768) return;
+    var sidebar = document.getElementById('consult-sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+        if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+            sidebar.classList.remove('open');
+        }
+    }
+}
+if (window.innerWidth <= 768) {
+    document.addEventListener('click', closeConsultSidebarOnOutsideClick);
+}
+
+// ========== Init ==========
+initSidebar();
+loadConsultations();
 </script>
 {% endblock %}

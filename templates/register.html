@@ -4,7 +4,7 @@
 {% block content %}
 <div class="auth-card">
     <h2>注册</h2>
-    <form method="post">
+    <form method="post" onsubmit="return validateForm(event)">
         <div class="form-group">
             <label>用户名</label>
             <input type="text" name="username" required>
@@ -17,8 +17,93 @@
             <label>密码</label>
             <input type="password" name="password" required minlength="6">
         </div>
+        <div class="form-group">
+            <label>手机号码</label>
+            <input type="tel" name="phone" id="reg-phone" required pattern="1\d{10}" placeholder="11位手机号" maxlength="11">
+        </div>
+        <div class="form-group">
+            <label>短信验证码</label>
+            <div class="sms-row">
+                <input type="text" name="sms_code" id="reg-sms-code" required placeholder="输入验证码" maxlength="6" pattern="\d{4,6}">
+                <button type="button" class="btn btn-sm btn-outline" id="send-sms-btn" onclick="sendSmsCode()">获取验证码</button>
+            </div>
+        </div>
         <button type="submit" class="btn btn-primary btn-block">注册</button>
     </form>
     <p class="auth-link">已有账号？<a href="/auth/login">立即登录</a></p>
 </div>
+
+<style>
+.sms-row { display: flex; gap: 8px; }
+.sms-row input { flex: 1; }
+.sms-row button { flex-shrink: 0; white-space: nowrap; }
+#send-sms-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.flash-error { display: none; }
+</style>
+
+<script>
+let smsTimer = 0;
+let smsCountdown = 0;
+
+function sendSmsCode() {
+    const phone = document.getElementById('reg-phone').value.trim();
+    if (!/^1\d{10}$/.test(phone)) {
+        alert('请输入正确的11位手机号');
+        return;
+    }
+
+    const btn = document.getElementById('send-sms-btn');
+    btn.disabled = true;
+    btn.textContent = '发送中...';
+
+    fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('验证码已发送，请查收短信');
+            startCountdown(60);
+        } else {
+            alert(data.message || '发送失败，请稍后重试');
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+        }
+    })
+    .catch(() => {
+        alert('网络错误，请重试');
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+    });
+}
+
+function startCountdown(seconds) {
+    const btn = document.getElementById('send-sms-btn');
+    smsCountdown = seconds;
+    btn.textContent = smsCountdown + 's';
+    clearInterval(smsTimer);
+    smsTimer = setInterval(() => {
+        smsCountdown--;
+        if (smsCountdown <= 0) {
+            clearInterval(smsTimer);
+            btn.disabled = false;
+            btn.textContent = '重新获取';
+        } else {
+            btn.textContent = smsCountdown + 's';
+        }
+    }, 1000);
+}
+
+function validateForm(e) {
+    const code = document.getElementById('reg-sms-code').value.trim();
+    if (code.length < 4) {
+        alert('请输入短信验证码');
+        e.preventDefault();
+        return false;
+    }
+    return true;
+}
+</script>
 {% endblock %}

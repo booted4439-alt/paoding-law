@@ -12,7 +12,7 @@
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-    <nav class="nav">
+    <nav class="nav {% block nav_class %}nav-hidden{% endblock %}">
         <div class="nav-inner">
             <a href="/" class="nav-logo">
                 <img src="{{ url_for('static', filename='avatar.png') }}" alt="庖丁" class="nav-avatar">
@@ -38,7 +38,7 @@
         </div>
     </nav>
 
-    <main class="main">
+    <main class="main {% block main_class %}main-full{% endblock %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for cat, msg in messages %}
@@ -49,7 +49,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="footer">
+    <footer class="footer {% block footer_class %}footer-hidden{% endblock %}">
         <div class="footer-inner">
             <div class="footer-links">
                 <a href="/privacy">隐私政策</a>
@@ -68,6 +68,35 @@
         // Auto-dismiss flash messages
         document.querySelectorAll('.flash').forEach(el => {
             setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }, 3000);
+        });
+        
+        // Mobile sidebar toggle (admin & docs pages)
+        function toggleAdminSidebar() {
+            const sidebar = document.getElementById('admin-sidebar');
+            if (sidebar) sidebar.classList.toggle('open');
+        }
+        function toggleDocsSidebar() {
+            const sidebar = document.getElementById('docs-sidebar');
+            if (sidebar) sidebar.classList.toggle('open');
+        }
+        
+        // Auto-close mobile sidebars when clicking outside
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth > 768) return;
+            // Admin sidebar
+            var adminSidebar = document.getElementById('admin-sidebar');
+            if (adminSidebar && adminSidebar.classList.contains('open')) {
+                if (!adminSidebar.contains(e.target) && !e.target.closest('.admin-sidebar-toggle')) {
+                    adminSidebar.classList.remove('open');
+                }
+            }
+            // Docs sidebar
+            var docsSidebar = document.getElementById('docs-sidebar');
+            if (docsSidebar && docsSidebar.classList.contains('open')) {
+                if (!docsSidebar.contains(e.target) && !e.target.closest('.docs-sidebar-toggle')) {
+                    docsSidebar.classList.remove('open');
+                }
+            }
         });
     </script>
     {% block scripts %}{% endblock %}

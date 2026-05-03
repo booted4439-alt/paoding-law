@@ -3,19 +3,25 @@
 {% block body_class %}docs-page{% endblock %}
 {% block content %}
 <div class="docs-layout">
-    <aside class="docs-sidebar">
+    <aside class="docs-sidebar" id="docs-sidebar">
         <div class="docs-search">
             <input type="text" id="doc-search" placeholder="搜索文档..." oninput="searchDocs()">
         </div>
-        <h3>分类</h3>
-        <div class="docs-categories">
-            <button class="cat-btn active" data-cat="" onclick="filterDocs('')">全部</button>
-            {% for cat in categories %}
-            <button class="cat-btn" data-cat="{{ cat }}" onclick="filterDocs('{{ cat }}')">{{ cat }}</button>
-            {% endfor %}
+        <div class="docs-sidebar-categories">
+            <h3>分类</h3>
+            <div class="docs-categories">
+                <button class="cat-btn active" data-cat="" onclick="filterDocs('')">全部</button>
+                {% for cat in categories %}
+                <button class="cat-btn" data-cat="{{ cat }}" onclick="filterDocs('{{ cat }}')">{{ cat }}</button>
+                {% endfor %}
+            </div>
         </div>
     </aside>
     <div class="docs-main">
+        <div class="docs-list-header">
+            <a href="/" class="top-home-link">庖丁首页</a>
+            <button class="sidebar-toggle docs-sidebar-toggle" id="docs-sidebar-toggle" onclick="toggleDocsSidebar()">☰</button>
+        </div>
         <div class="docs-list" id="docs-list"></div>
         <div class="doc-detail" id="doc-detail" style="display:none">
             <button class="btn btn-sm btn-outline" onclick="backToList()">← 返回列表</button>
@@ -70,7 +76,7 @@ function showDoc(id) {
             document.getElementById('doc-content').innerHTML = `
                 <h2>${escHtml(d.title)}</h2>
                 <div class="doc-meta">分类: ${escHtml(d.category)} | 更新于 ${d.updated_at}</div>
-                <div class="doc-body">${renderContent(d.content)}</div>
+                <div class="doc-body">${d.rendered || renderContent(d.content)}</div>
             `;
         });
 }
@@ -81,13 +87,38 @@ function backToList() {
 }
 
 function renderContent(content) {
-    // simple markdown-like rendering
-    return content.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')
-        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    // fallback client-side rendering (used when server rendering unavailable)
+    if (!content) return '';
+    let html = content
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // Convert markdown tables to HTML tables
+    html = html.replace(/(^\|.+\|[\s\S]*?)(?=\n{2,}|$)/gm, function(block) {
+        var lines = block.trim().split('\n');
+        if (lines.length < 2) return block;
+        if (!/^\|\s*[-:]/.test(lines[1].trim())) return block;
+        var headers = lines[0].split('|').filter(function(c){return c.trim();});
+        if (!headers.length) return block;
+        var thead = '<thead><tr>' + headers.map(function(h){return '<th>'+h.trim()+'</th>';}).join('') + '</tr></thead>';
+        var tbody = '';
+        for (var i=2;i<lines.length;i++){
+            var cells = lines[i].split('|').filter(function(c){return c.trim();});
+            if (!cells.length) continue;
+            tbody += '<tr>' + cells.map(function(c){return '<td>'+c.trim()+'</td>';}).join('') + '</tr>';
+        }
+        if (!tbody) return block;
+        return '<div class="table-wrap"><table>' + thead + tbody + '</table></div>';
+    });
+    
+    html = html
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>');
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+    return '<p>' + html + '</p>';
 }
 
 function escHtml(s) {
