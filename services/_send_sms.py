@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""发送短信验证码 - 子进程"""
+"""发送短信验证码 - 子进程（从环境变量读取密钥）"""
 import json, sys, time, hashlib, hmac, base64, uuid, urllib.parse, os
 os.environ["no_proxy"] = "*"
 import requests
 
-AK = "ALIYUN_AK_PLACEHOLDER"
-SK = "ALIYUN_SK_PLACEHOLDER"
-SN = "速通互联验证码"
-TC = "100001"
+AK = os.environ["ALIYUN_SMS_AK"]
+SK = os.environ["ALIYUN_SMS_SK"]
+SN = os.environ.get("ALIYUN_SMS_SIGN", "速通互联验证码")
+TC = os.environ.get("ALIYUN_SMS_TPL", "100001")
 
 pn = sys.argv[1]
 ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

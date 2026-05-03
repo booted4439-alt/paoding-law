@@ -1,4 +1,4 @@
-"""短信验证码服务 - 子进程方式（避免 gunicorn 网络问题）"""
+"""短信验证码服务 - 子进程方式"""
 import json, random, time, subprocess, sys, os
 
 _codes = {}
@@ -11,7 +11,6 @@ def send_sms_code(pn, code=None):
     if code is None:
         code = generate_code()
     _codes[pn] = {"code": code, "expire": time.time() + 300}
-
     try:
         proc = subprocess.run(
             [sys.executable, _SCRIPT, pn],
@@ -27,7 +26,6 @@ def send_sms_code(pn, code=None):
             print("[SMS] 子进程失败:", proc.stderr[:100])
     except Exception as e:
         print("[SMS] 子进程异常:", str(e)[:100])
-
     print("[SMS] 本地:", pn, "->", code)
     return {"success": True, "message": "验证码已发送", "debug_code": code}
 
