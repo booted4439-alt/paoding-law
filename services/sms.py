@@ -10,7 +10,17 @@ def generate_code(l=6):
     return "".join(str(random.randint(0, 9)) for _ in range(l))
 
 
+# 本地频率缓存，避免频繁调用阿里云API导致biz.FREQUENCY
+_last_sent = {}
+
 def send_sms_code(pn, code=None):
+    # 检查本地频率限制（60秒内不重复发送）
+    now = time.time()
+    if pn in _last_sent and now - _last_sent[pn] < 55:
+        print("[SMS] 本地频率限制，跳过:", pn)
+        return {"success": True, "message": "验证码已发送，请查收短信"}
+    _last_sent[pn] = now
+
     try:
         proc = subprocess.run(
             [sys.executable, _SCRIPT_SEND, pn],
@@ -18,10 +28,15 @@ def send_sms_code(pn, code=None):
         )
         if proc.returncode == 0 and proc.stdout.strip():
             result = json.loads(proc.stdout.strip())
-            if result.get("Success") and result.get("Code") == "OK":
+            code = result.get("Code")
+            if result.get("Success") and code == "OK":
                 print("[SMS] OK:", pn)
                 return {"success": True, "message": "验证码已发送"}
-            print("[SMS] 返回:", result.get("Code"), result.get("Message"))
+            # 频率限制：验证码已发送过，仍然有效
+            if code == "biz.FREQUENCY":
+                print("[SMS] 频率限制，使用已有验证码:", pn)
+                return {"success": True, "message": "验证码已发送，请查收短信"}
+            print("[SMS] 返回:", code, result.get("Message"))
         else:
             print("[SMS] 子进程失败:", proc.stderr[:100])
     except Exception as e:
