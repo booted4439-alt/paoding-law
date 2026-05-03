@@ -154,10 +154,7 @@ def sms_send():
 
     result = send_sms_code(phone)
     if result.get('success'):
-        resp = {'success': True, 'message': '验证码已发送'}
-        if 'debug_code' in result:
-            resp['debug_code'] = result['debug_code']
-        return jsonify(resp)
+        return jsonify({'success': True, 'message': '验证码已发送'})
     else:
         return jsonify({'success': False, 'message': result.get('message', '发送失败')}), 500
 

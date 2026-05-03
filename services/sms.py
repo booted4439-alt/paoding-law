@@ -26,8 +26,7 @@ def send_sms_code(pn, code=None):
             print("[SMS] 子进程失败:", proc.stderr[:100])
     except Exception as e:
         print("[SMS] 子进程异常:", str(e)[:100])
-    print("[SMS] 本地:", pn, "->", code)
-    return {"success": True, "message": "验证码已发送", "debug_code": code}
+    return {"success": False, "message": "短信发送失败，请稍后重试"}
 
 def check_sms_code(pn, vc):
     r = _codes.get(pn)
