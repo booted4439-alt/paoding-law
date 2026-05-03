@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from functools import wraps
 
+# Eventlet monkey-patch for async workers
+
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, jsonify, send_from_directory, abort)
 from flask_login import (LoginManager, login_user, logout_user,
@@ -152,7 +154,10 @@ def sms_send():
 
     result = send_sms_code(phone)
     if result.get('success'):
-        return jsonify({'success': True, 'message': '验证码已发送'})
+        resp = {'success': True, 'message': '验证码已发送'}
+        if 'debug_code' in result:
+            resp['debug_code'] = result['debug_code']
+        return jsonify(resp)
     else:
         return jsonify({'success': False, 'message': result.get('message', '发送失败')}), 500
 
