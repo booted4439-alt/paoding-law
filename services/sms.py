@@ -4,6 +4,12 @@ import json, time, subprocess, sys, os
 _SCRIPT_SEND = os.path.join(os.path.dirname(__file__), "_send_sms.py")
 _SCRIPT_VERIFY = os.path.join(os.path.dirname(__file__), "_verify_sms.py")
 
+def generate_code(l=6):
+    """生成随机验证码（兼容旧引用）"""
+    import random
+    return "".join(str(random.randint(0, 9)) for _ in range(l))
+
+
 def send_sms_code(pn, code=None):
     try:
         proc = subprocess.run(
