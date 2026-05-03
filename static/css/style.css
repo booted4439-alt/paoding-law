@@ -443,10 +443,12 @@ a:hover { text-decoration: underline; }
 }
 .sidebar-header {
     padding: 16px;
+    border-bottom: 1px solid var(--border-light);
+}
+.sidebar-header-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--border-light);
 }
 .sidebar-header h2 { font-size: 1rem; }
 .sidebar-filters {
