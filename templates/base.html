@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ range(1, 100) | random }}{{ range(1, 100) | random }}">
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -77,6 +77,18 @@
             inp.type = isPwd ? 'text' : 'password';
             btn.textContent = isPwd ? '🙈' : '👁';
         }
+
+        // Homepage mobile nav: 点击外部自动收起
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth > 768) return;
+            var navLinks = document.querySelector('.nav-links');
+            var navToggle = document.querySelector('.nav-toggle');
+            if (navLinks && navLinks.classList.contains('open')) {
+                if (!navLinks.contains(e.target) && !navToggle.contains(e.target)) {
+                    navLinks.classList.remove('open');
+                }
+            }
+        });
 
         // Mobile sidebar toggle (admin & docs pages)
         function toggleAdminSidebar() {
