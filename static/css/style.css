@@ -121,6 +121,8 @@ a:hover { text-decoration: underline; }
     max-width: 800px;
     margin: 0 auto;
 }
+body.home-page { background: url('/static/bg_main.png') no-repeat center top / cover fixed; min-height: 100vh; }
+.features { background: var(--bg); }
 .hero-badge {
     display: inline-block;
     padding: 6px 16px;
