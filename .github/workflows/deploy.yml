@@ -1,0 +1,27 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /var/www/paodinglaw
+            git fetch origin
+            git reset --hard origin/main
+            /usr/local/python310/bin/pip3 install -r requirements.txt --quiet
+            # Restart gunicorn
+            supervisorctl restart paodinglaw 2>/dev/null || systemctl restart paodinglaw 2>/dev/null || \
+              (kill -HUP $(cat /tmp/gunicorn.pid 2>/dev/null) 2>/dev/null) || \
+              echo "Manual restart needed"
