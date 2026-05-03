@@ -120,9 +120,7 @@ def auth_register():
             flash('请完成手机验证', 'error')
             return render_template('register.html')
 
-        if User.query.filter_by(username=username).first():
-            flash('用户名已存在', 'error')
-        elif User.query.filter_by(email=email).first():
+        if User.query.filter_by(email=email).first():
             flash('邮箱已注册', 'error')
         elif User.query.filter_by(phone=phone).first():
             flash('该手机号已注册', 'error')
@@ -728,8 +726,6 @@ def admin_create_user():
 
     if not username or not email or not password:
         return jsonify({'error': '用户名、邮箱、密码为必填'}), 400
-    if User.query.filter_by(username=username).first():
-        return jsonify({'error': '用户名已存在'}), 400
     if User.query.filter_by(email=email).first():
         return jsonify({'error': '邮箱已注册'}), 400
     if phone and User.query.filter_by(phone=phone).first():
