@@ -792,6 +792,13 @@ def admin_delete_user(u_id):
     user = db.session.get(User, u_id)
     if not user:
         return jsonify({'error': '用户未找到'}), 404
+    # Delete associated consultations and messages first
+    cons = Consultation.query.filter_by(user_id=u_id).all()
+    for c in cons:
+        Message.query.filter_by(consultation_id=c.id).delete()
+        db.session.delete(c)
+    # Remove lawyer assignments
+    Consultation.query.filter_by(lawyer_id=u_id).update({Consultation.lawyer_id: None})
     db.session.delete(user)
     db.session.commit()
     return jsonify({'ok': True})
