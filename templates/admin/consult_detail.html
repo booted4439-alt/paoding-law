@@ -14,7 +14,7 @@
     <div class="admin-main">
         <div class="admin-header">
             <a href="/admin/consultations" class="btn btn-sm btn-outline">← 返回列表</a>
-            <div class="admin-header-right"><a href="/" class="top-home-link">庖丁首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
+            <div class="admin-header-right"><a href="/" class="top-home-link">首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
         </div>
         <h2>咨询 #{{ consultation.id }} - {{ consultation.title }}</h2>
         <div class="consult-info">
@@ -39,15 +39,23 @@
     </div>
 </div>
 
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 const cid = {{ consultation.id }};
 let adminUploadedFiles = [];
-const socket = io();
-socket.emit('join', { consultation_id: cid });
-socket.on('new_message', function(data) {
-    if (data.consultation_id == cid) appendMsg(data.message);
-});
+
+// 定期轮询新消息（代替Socket.IO，避免同步worker卡顿）
+var pollTimer = setInterval(function() {
+    fetch('/api/consultations/' + cid + '/messages')
+        .then(r => r.json())
+        .then(msgs => {
+            var container = document.getElementById('admin-messages');
+            var currentCount = container.children.length;
+            if (msgs.length > currentCount) {
+                container.innerHTML = '';
+                msgs.forEach(function(m) { appendMsg(m); });
+            }
+        });
+}, 5000);
 
 function loadMessages() {
     fetch('/api/consultations/' + cid + '/messages')
@@ -105,6 +113,8 @@ function adminSend(e) {
                 document.getElementById('admin-file-previews').innerHTML = '';
                 document.getElementById('admin-msg-hint').textContent = '';
                 input.style.height = 'auto';
+                // 立即刷新消息列表，不依赖Socket.IO
+                loadMessages();
             } else if (data.error) {
                 alert(data.error);
             }

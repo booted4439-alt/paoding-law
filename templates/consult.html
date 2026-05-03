@@ -85,10 +85,9 @@
     </div>
 </div>
 
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
 let currentConsultationId = null;
-let socket = null;
+let pollTimer = null;
 let uploadedFiles = [];
 
 // ========== Sidebar Logic ==========
@@ -125,16 +124,24 @@ window.addEventListener('resize', function() {
 });
 
 // ========== Init Socket ==========
+var pollTimer = null;
 function initSocket(cid) {
-    if (socket) socket.disconnect();
-    socket = io();
-    socket.emit('join', { consultation_id: cid });
-    socket.on('new_message', function(data) {
-        if (data.consultation_id == currentConsultationId) {
-            appendMessage(data.message, data.message.sender_id);
-        }
-        loadConsultations();
-    });
+    if (pollTimer) clearInterval(pollTimer);
+    // 定时轮询新消息
+    pollTimer = setInterval(function() {
+        if (currentConsultationId !== cid) return;
+        fetch('/api/consultations/' + cid + '/messages')
+            .then(r => r.json())
+            .then(msgs => {
+                var container = document.getElementById('chat-messages');
+                var currentCount = container.children.length;
+                if (msgs.length > currentCount) {
+                    container.innerHTML = '';
+                    msgs.forEach(function(m) { appendMessage(m, m.sender_id); });
+                    scrollToBottom();
+                }
+            });
+    }, 5000);
 }
 
 // ========== Load Chat List ==========
@@ -274,6 +281,15 @@ function sendMessage(e) {
                 document.getElementById('file-previews').innerHTML = '';
                 input.style.height = 'auto';
                 loadConsultations();
+                // 立即刷新消息
+                fetch('/api/consultations/' + currentConsultationId + '/messages')
+                    .then(r => r.json())
+                    .then(msgs => {
+                        var container = document.getElementById('chat-messages');
+                        container.innerHTML = '';
+                        msgs.forEach(function(m) { appendMessage(m, m.sender_id); });
+                        setTimeout(function() { container.scrollTop = container.scrollHeight; }, 50);
+                    });
             } else if (data.error) {
                 alert(data.error);
             }
@@ -334,7 +350,7 @@ function startNewChat() {
     document.getElementById('chat-container').style.display = 'none';
     document.getElementById('chat-empty').style.display = 'flex';
     currentConsultationId = null;
-    if (socket) socket.disconnect();
+    if (pollTimer) clearInterval(pollTimer);
     document.getElementById('first-message-input').value = '';
     firstUploadedFiles = [];
     document.getElementById('first-file-previews').innerHTML = '';
@@ -424,7 +440,7 @@ function closeChat() {
     currentConsultationId = null;
     document.getElementById('chat-container').style.display = 'none';
     document.getElementById('chat-empty').style.display = 'flex';
-    if (socket) socket.disconnect();
+    if (pollTimer) clearInterval(pollTimer);
 }
 
 function closeCurrentChat() {
