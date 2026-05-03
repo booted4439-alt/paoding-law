@@ -528,8 +528,8 @@ a:hover { text-decoration: underline; }
 }
 .message-self {
     align-self: flex-end;
-    background: var(--primary);
-    color: #fff;
+    background: var(--primary-light);
+    color: var(--text);
     border-bottom-right-radius: 4px;
 }
 .message-other {
@@ -543,7 +543,7 @@ a:hover { text-decoration: underline; }
 .message-other .message-time { text-align: right; }
 .msg-img { max-width: 200px; border-radius: var(--radius-sm); cursor: pointer; }
 .message-file { margin-top: 8px; }
-.message-self .message-file a { color: #fff; opacity: 0.85; }
+.message-self .message-file a { color: var(--primary); opacity: 0.85; }
 .message-other .message-file a { color: var(--primary); }
 
 .chat-input-area {
@@ -1126,8 +1126,8 @@ a:hover { text-decoration: underline; }
 }
 .message-self {
     align-self: flex-end;
-    background: var(--primary);
-    color: #fff;
+    background: var(--primary-light);
+    color: var(--text);
     border-bottom-right-radius: 4px;
 }
 .message-other {
@@ -1137,7 +1137,7 @@ a:hover { text-decoration: underline; }
 .message-sender { font-size: 0.75rem; margin-bottom: 4px; opacity: 0.65; }
 .message-content { white-space: pre-wrap; }
 .message-content a { color: inherit; text-decoration: underline; }
-.message-self .message-content a { color: #fff; }
+.message-self .message-content a { color: var(--primary); }
 .message-time { font-size: 0.7rem; margin-top: 4px; opacity: 0.5; }
 .message-other .message-time { text-align: right; }
 .msg-img {
@@ -1149,7 +1149,7 @@ a:hover { text-decoration: underline; }
     display: block;
 }
 .message-file { margin-top: 6px; }
-.message-self .message-file a { color: #fff; opacity: 0.85; }
+.message-self .message-file a { color: var(--primary); opacity: 0.85; }
 .message-other .message-file a { color: var(--primary); }
 
 /* Mobile-only elements */
