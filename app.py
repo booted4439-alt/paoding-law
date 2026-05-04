@@ -95,6 +95,7 @@ def init_db():
         'wechat_qr': '',
         'address': '上海市浦东新区陆家嘴环路1000号',
         'phone': '021-6888-8888',
+        'email': 'contact@paodinglaw.com',
         'icp_beian': '沪ICP备2025XXXXXX号',
         'police_beian': '',
         'privacy_content': '# 隐私政策\n\n我们重视您的隐私...',

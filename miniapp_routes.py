@@ -329,7 +329,7 @@ def update_profile(current_user):
 @mini_app.route('/api/site/settings', methods=['GET'])
 def site_settings():
     """获取站点公开设置（无需登录）"""
-    keys = ['site_name', 'wechat_qr', 'address', 'phone',
+    keys = ['site_name', 'wechat_qr', 'address', 'phone', 'email',
             'icp_beian', 'police_beian']
     result = {}
     for k in keys:
