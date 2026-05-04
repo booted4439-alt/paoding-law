@@ -238,22 +238,54 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
 .main { flex: 1; padding-top: 64px; }
 .footer {
     border-top: 1px solid var(--border-light);
-    background: var(--bg);
-    padding: 24px;
+    background: #f8f9fb;
+    padding: 36px 24px 32px;
+    margin-top: 40px;
 }
 .footer-inner {
     max-width: 1200px;
     margin: 0 auto;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 20px;
+}
+.footer-row-1 {
+    display: flex;
+    justify-content: center;
     align-items: center;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 16px 28px;
 }
-.footer-links { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-.footer-links a { color: var(--text-secondary); font-size: 0.85rem; }
-.footer-work-hours { color: var(--text-muted); font-size: 0.8rem; margin-left: 10px; }
-.footer-info { display: flex; gap: 16px; color: var(--text-muted); font-size: 0.8rem; }
+.footer-links { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.footer-links a { color: #555; font-size: 0.85rem; text-decoration: none; }
+.footer-links a:hover { color: #4d6bfe; text-decoration: underline; }
+.footer-separator {
+    width: 1px;
+    height: 16px;
+    background: #d0d0d0;
+}
+.footer-work-hours { 
+    color: #888; 
+    font-size: 0.8rem; 
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.footer-divider {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, #4d6bfe, #7c93ff);
+    margin: 0 auto;
+    border-radius: 2px;
+}
+.footer-info { 
+    display: flex; 
+    gap: 20px; 
+    color: #aaa; 
+    font-size: 0.75rem; 
+    justify-content: center;
+    flex-wrap: wrap;
+}
 
 /* ===================== FLASH ===================== */
 .flash {
@@ -1223,7 +1255,9 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
     .docs-sidebar-toggle { display: inline-flex !important; }
     .docs-list-header { justify-content: space-between !important; }
     .admin-stats { grid-template-columns: repeat(2, 1fr); }
-    .footer-inner { flex-direction: column; text-align: center; }
+    .footer-inner { gap: 16px; }
+    .footer-separator { display: none; }
+    .footer-row-1 { flex-direction: column; gap: 12px; }
 }
 
 /* ===================== HOME LINKS ===================== */
