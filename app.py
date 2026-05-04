@@ -714,7 +714,7 @@ def admin_settings():
 @login_required
 @admin_required
 def admin_get_settings():
-    keys = ['site_name', 'wechat_qr', 'address', 'phone',
+    keys = ['site_name', 'wechat_qr', 'address', 'phone', 'email',
             'icp_beian', 'police_beian', 'privacy_content', 'terms_content']
     return jsonify({k: SiteSetting.get(k) for k in keys})
 
