@@ -13,6 +13,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     phone = db.Column(db.String(20), unique=True)
+    openid = db.Column(db.String(100), nullable=True)  # 微信 openid（唯一性由应用层保证）
     is_admin = db.Column(db.Boolean, default=False)
     is_lawyer = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -21,7 +22,8 @@ class User(UserMixin, db.Model):
                                     foreign_keys='Consultation.user_id', lazy='dynamic')
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        # 使用 pbkdf2 而非 scrypt（兼容 Python 3.9 无 scrypt 的环境）
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256:600000')
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)

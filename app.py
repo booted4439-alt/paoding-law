@@ -28,6 +28,27 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'auth_login'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Register mini-program API blueprint
+from miniapp_routes import mini_app
+from miniapp_routes import verify_token as mini_verify_token
+app.register_blueprint(mini_app)
+
+
+# ---------- before_request: Bearer token → Flask-Login ----------
+@app.before_request
+def auto_login_from_bearer_token():
+    """Bearer Token 登录（小程序用）"""
+    if current_user.is_authenticated:
+        return
+    auth = request.headers.get('Authorization', '').strip()
+    if auth.startswith('Bearer '):
+        token = auth[7:]
+        user_id = mini_verify_token(token)
+        if user_id:
+            user = db.session.get(User, int(user_id))
+            if user:
+                login_user(user)
+
 
 # ---------- helpers ----------
 def get_setting(key, default=''):
@@ -212,6 +233,7 @@ def consult_page():
 @app.route('/api/consultations', methods=['GET'])
 @login_required
 def list_consultations():
+    app.logger.warning(f'list_consultations called, user={current_user.username} auth={current_user.is_authenticated}')
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
     q = request.args.get('q', '').strip()
@@ -346,6 +368,24 @@ def close_consultation(c_id):
     c.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({'ok': True, 'status': 'closed'})
+
+
+@app.route('/api/consultations/<int:c_id>', methods=['GET'])
+@login_required
+def get_consultation(c_id):
+    c = db.session.get(Consultation, c_id)
+    if not c or (c.user_id != current_user.id and not current_user.is_lawyer and not current_user.is_admin):
+        return jsonify({'error': '无权限'}), 403
+    return jsonify({
+        'id': c.id,
+        'title': c.title,
+        'description': c.description,
+        'status': c.status,
+        'lawyer': c.lawyer.username if c.lawyer else None,
+        'message_count': c.messages.count(),
+        'created_at': c.created_at.strftime('%Y-%m-%d %H:%M'),
+        'updated_at': c.updated_at.strftime('%Y-%m-%d %H:%M'),
+    })
 
 
 @app.route('/api/consultations/<int:c_id>/messages', methods=['GET'])
@@ -806,6 +846,16 @@ def handle_join(data):
 
 
 # ===================== RUN =====================
+
+
+@app.errorhandler(401)
+def unauthorized(e):
+    """401：API 请求返回 JSON，页面请求跳转登录页"""
+    if request.path.startswith('/api/'):
+        return jsonify({'error': '未登录或登录已过期'}), 401
+    return redirect(url_for('auth_login', next=request.path))
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
