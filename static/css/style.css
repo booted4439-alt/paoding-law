@@ -250,8 +250,9 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
     flex-wrap: wrap;
     gap: 12px;
 }
-.footer-links { display: flex; gap: 20px; }
+.footer-links { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 .footer-links a { color: var(--text-secondary); font-size: 0.85rem; }
+.footer-work-hours { color: var(--text-muted); font-size: 0.8rem; margin-left: 10px; }
 .footer-info { display: flex; gap: 16px; color: var(--text-muted); font-size: 0.8rem; }
 
 /* ===================== FLASH ===================== */
