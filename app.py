@@ -3,6 +3,15 @@ import uuid
 from datetime import datetime, timezone
 from functools import wraps
 
+# 加载 .env 配置文件（本地开发用，服务端没有 dotenv 也不影响）
+try:
+    from dotenv import load_dotenv
+    dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(dotenv_path):
+        load_dotenv(dotenv_path)
+except ImportError:
+    pass
+
 # Eventlet monkey-patch for async workers
 
 from flask import (Flask, render_template, request, redirect, url_for,
@@ -111,16 +120,137 @@ def init_db():
 # ===================== AUTH =====================
 @app.route('/auth/login', methods=['GET', 'POST'])
 def auth_login():
+    login_mode = 'password'
     if request.method == 'POST':
         phone = request.form.get('phone', '').strip()
-        password = request.form.get('password', '')
-        user = User.query.filter_by(phone=phone).first()
-        if user and user.check_password(password):
-            login_user(user)
-            next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
-        flash('手机号或密码错误', 'error')
-    return render_template('login.html')
+        login_mode = request.form.get('login_mode', 'password')
+
+        if login_mode == 'sms':
+            # 验证码登录
+            sms_code = request.form.get('sms_code', '').strip()
+            if not sms_code:
+                flash('请输入验证码', 'error')
+                return render_template('login.html', login_mode='sms')
+            try:
+                from services.sms import check_sms_code
+                verify_result = check_sms_code(phone, sms_code)
+                if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
+                    flash('验证码错误或已过期', 'error')
+                    return render_template('login.html', login_mode='sms')
+            except Exception:
+                pass  # 开发模式降级
+            user = User.query.filter_by(phone=phone).first()
+            if user:
+                login_user(user)
+                next_page = request.args.get('next')
+                return redirect(next_page or url_for('index'))
+            flash('该手机号未注册', 'error')
+            return render_template('login.html', login_mode='sms')
+        else:
+            # 密码登录
+            password = request.form.get('password', '')
+            user = User.query.filter_by(phone=phone).first()
+            if user and user.check_password(password):
+                login_user(user)
+                next_page = request.args.get('next')
+                return redirect(next_page or url_for('index'))
+            flash('手机号或密码错误', 'error')
+    return render_template('login.html', login_mode=login_mode)
+
+
+# ===================== 微信扫码登录（网站） =====================
+@app.route('/auth/wechat/login')
+def wechat_web_auth():
+    """跳转到微信扫码页面"""
+    appid = os.environ.get('WX_WEB_APPID', '')
+    if not appid:
+        flash('微信登录未配置', 'error')
+        return redirect(url_for('auth_login'))
+    redirect_uri = url_for('wechat_web_callback', _external=True)
+    state = uuid.uuid4().hex[:8]
+    # 保存 state 用于验证回调
+    wx_url = (
+        'https://open.weixin.qq.com/connect/qrconnect'
+        f'?appid={appid}'
+        f'&redirect_uri={redirect_uri}'
+        '&response_type=code'
+        '&scope=snsapi_login'
+        f'&state={state}'
+        '#wechat_redirect'
+    )
+    return redirect(wx_url)
+
+
+@app.route('/auth/wechat/callback')
+def wechat_web_callback():
+    """微信扫码回调"""
+    code = request.args.get('code', '')
+    state = request.args.get('state', '')
+    if not code:
+        flash('微信登录失败', 'error')
+        return redirect(url_for('auth_login'))
+
+    appid = os.environ.get('WX_WEB_APPID', '')
+    secret = os.environ.get('WX_WEB_SECRET', '')
+    if not appid or not secret:
+        flash('微信登录未配置', 'error')
+        return redirect(url_for('auth_login'))
+
+    try:
+        import requests
+        # 用 code 换取 access_token + openid
+        resp = requests.get(
+            'https://api.weixin.qq.com/sns/oauth2/access_token',
+            params={
+                'appid': appid,
+                'secret': secret,
+                'code': code,
+                'grant_type': 'authorization_code'
+            },
+            timeout=10
+        )
+        data = resp.json()
+        if 'openid' not in data:
+            current_app.logger.error(f'微信网页登录失败: {data}')
+            flash('微信登录失败', 'error')
+            return redirect(url_for('auth_login'))
+
+        openid = data['openid']
+        access_token = data.get('access_token', '')
+
+        # 获取用户信息
+        user = User.query.filter_by(openid=openid).first()
+        if not user:
+            # 尝试获取微信昵称
+            nickname = '用户'
+            try:
+                info_resp = requests.get(
+                    'https://api.weixin.qq.com/sns/userinfo',
+                    params={'access_token': access_token, 'openid': openid},
+                    timeout=10
+                )
+                info = info_resp.json()
+                if info.get('nickname'):
+                    nickname = info['nickname']
+            except Exception:
+                pass
+            user = User(
+                username=nickname,
+                email=f'{openid}@wechat.paodinglaw.com',
+                openid=openid,
+                phone=None
+            )
+            user.set_password(openid[:16])
+            db.session.add(user)
+            db.session.commit()
+
+        login_user(user)
+        flash('微信登录成功', 'success')
+        return redirect(url_for('index'))
+    except Exception as e:
+        current_app.logger.error(f'微信网页登录异常: {e}')
+        flash('微信登录异常', 'error')
+        return redirect(url_for('auth_login'))
 
 
 @app.route('/auth/register', methods=['GET', 'POST'])
@@ -174,7 +304,7 @@ def sms_send():
 
     result = send_sms_code(phone)
     if result.get('success'):
-        return jsonify({'success': True, 'message': '验证码已发送'})
+        return jsonify({'success': True, 'message': result.get('message', '验证码已发送')})
     else:
         return jsonify({'success': False, 'message': result.get('message', '发送失败')}), 500
 
@@ -860,4 +990,4 @@ def unauthorized(e):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, use_reloader=False, host='0.0.0.0', port=5000)

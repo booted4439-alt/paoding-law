@@ -23,6 +23,7 @@
                 <a href="/documents" class="nav-link">法律文档</a>
                 <a href="/contact" class="nav-link">联系我们</a>
                 {% if current_user.is_authenticated %}
+                    <span class="nav-link nav-user">{{ current_user.username }}</span>
                     {% if current_user.is_admin %}
                         <a href="/admin" class="nav-link admin-link">管理后台</a>
                     {% endif %}
@@ -80,7 +81,7 @@
             const inp = document.getElementById(id);
             const isPwd = inp.type === 'password';
             inp.type = isPwd ? 'text' : 'password';
-            btn.textContent = isPwd ? '🙈' : '👁';
+            btn.textContent = isPwd ? '显示' : '隐藏';
         }
 
         // Homepage mobile nav: 点击外部自动收起

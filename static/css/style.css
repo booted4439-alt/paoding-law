@@ -90,6 +90,10 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--border);
     font-weight: 500;
 }
+.nav-user {
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
 .nav-btn-primary {
     background: var(--primary);
     color: #fff !important;

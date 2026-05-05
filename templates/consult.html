@@ -124,7 +124,6 @@ window.addEventListener('resize', function() {
 });
 
 // ========== Init Socket ==========
-var pollTimer = null;
 function initSocket(cid) {
     if (pollTimer) clearInterval(pollTimer);
     // 定时轮询新消息

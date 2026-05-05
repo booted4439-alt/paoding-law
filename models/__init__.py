@@ -2,6 +2,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
+from datetime import timedelta
+
+# 上海时区 (UTC+8)
+def _now():
+    return datetime.utcnow() + timedelta(hours=8)
 
 db = SQLAlchemy()
 
@@ -13,10 +18,11 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     phone = db.Column(db.String(20), unique=True)
-    openid = db.Column(db.String(100), nullable=True)  # 微信 openid（唯一性由应用层保证）
+    openid = db.Column(db.String(64), unique=True)
+    wx_session_key = db.Column(db.String(64))
     is_admin = db.Column(db.Boolean, default=False)
     is_lawyer = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=_now)
 
     consultations = db.relationship('Consultation', backref='client',
                                     foreign_keys='Consultation.user_id', lazy='dynamic')
@@ -37,9 +43,9 @@ class Consultation(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, active, closed
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     lawyer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
-                           onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now,
+                           onupdate=_now)
 
     lawyer = db.relationship('User', foreign_keys=[lawyer_id])
     messages = db.relationship('Message', backref='consultation', lazy='dynamic',
@@ -55,7 +61,7 @@ class Message(db.Model):
     file_url = db.Column(db.String(500))
     file_type = db.Column(db.String(50))
     is_system = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=_now)
 
     sender = db.relationship('User', foreign_keys=[sender_id])
 
@@ -68,9 +74,9 @@ class LegalDocument(db.Model):
     content = db.Column(db.Text, nullable=False)
     summary = db.Column(db.Text)
     is_published = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
-                           onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now,
+                           onupdate=_now)
 
 
 class SiteSetting(db.Model):

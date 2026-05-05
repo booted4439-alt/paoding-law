@@ -8,6 +8,7 @@ import hmac
 import hashlib
 import time
 import json
+import base64
 from datetime import datetime, timezone
 from functools import wraps
 
@@ -80,6 +81,13 @@ def token_required(f):
     return wrapper
 
 
+def is_dev_mode():
+    """检查是否为开发模式（未配置微信小程序）"""
+    appid = os.environ.get('WX_MINI_APPID', '')
+    secret = os.environ.get('WX_MINI_SECRET', '')
+    return not appid or not secret
+
+
 # ---- Blueprint ----
 mini_app = Blueprint('mini_app', __name__)
 
@@ -89,46 +97,48 @@ mini_app = Blueprint('mini_app', __name__)
 def wechat_login():
     """
     微信小程序登录
-    使用 wx.login() 返回的 code 换取 openid
-    注意：需要配置微信小程序的 appid 和 secret
+    使用 wx.login() 返回的 code 换取 openid + session_key
+    session_key 存储在用户记录中，用于后续 getPhoneNumber 解密
     """
     data = request.get_json() or {}
     code = data.get('code', '').strip()
+    nickname = data.get('nickname', '').strip()
 
     if not code:
         return jsonify({'error': '缺少 code 参数'}), 400
 
-    # 从环境变量读取微信小程序配置
     appid = os.environ.get('WX_MINI_APPID', '')
     secret = os.environ.get('WX_MINI_SECRET', '')
 
     if not appid or not secret:
-        # 开发模式：无微信配置时自动创建/登录测试用户
-        user = User.query.filter_by(username='mini_user').first()
+        # ---- 开发模式：无微信配置 ----
+        code_tag = code[:8]
+        uname = nickname or f'mini_dev_{code_tag}'
+        user = User.query.filter_by(username=f'mini_dev_{code_tag}').first()
         if not user:
             user = User(
-                username=f'mini_user_{code[:8]}',
-                email=f'mini_{code[:8]}@paodinglaw.com',
+                username=uname,
+                email=f'dev_{code_tag}@paodinglaw.com',
                 phone=None
             )
             user.set_password(code[:16])
             db.session.add(user)
             db.session.commit()
+        elif nickname and user.username.startswith('mini_dev_'):
+            # 之前用默认名，现在有昵称了就更新
+            user.username = nickname
+            db.session.commit()
 
         token = generate_token(user.id)
         return jsonify({
             'token': token,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'phone': user.phone or '',
-                'email': user.email,
-                'is_admin': user.is_admin,
-                'is_lawyer': user.is_lawyer
-            }
+            'user': serialize_user(user),
+            'has_phone': bool(user.phone),
+            'dev_mode': True,
+            'needs_bind': not bool(user.phone)
         })
 
-    # 生产环境：调用微信接口
+    # ---- 生产环境：调用微信接口 ----
     try:
         import requests
         resp = requests.get(
@@ -143,33 +153,39 @@ def wechat_login():
         )
         result = resp.json()
         if 'openid' not in result:
+            current_app.logger.error(f'微信登录失败: {result}')
             return jsonify({'error': '微信登录失败'}), 400
 
         openid = result['openid']
-        # 查找或创建用户
+        session_key = result.get('session_key', '')
+
         user = User.query.filter_by(openid=openid).first()
         if not user:
+            # 新用户：优先使用微信昵称
+            uname = nickname if nickname else '新用户'
             user = User(
-                username=f'微信用户_{openid[-6:]}',
+                username=uname,
                 email=f'{openid}@wechat.paodinglaw.com',
                 openid=openid,
+                wx_session_key=session_key,
                 phone=None
             )
             user.set_password(openid[:16])
             db.session.add(user)
-            db.session.commit()
+        else:
+            # 老用户：更新 session_key，如果有新昵称则更新
+            user.wx_session_key = session_key
+            if nickname and (user.username == '新用户' or user.username.startswith('微信用户_') or user.username.startswith('用户_')):
+                user.username = nickname
+        db.session.commit()
 
         token = generate_token(user.id)
         return jsonify({
             'token': token,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'phone': user.phone or '',
-                'email': user.email,
-                'is_admin': user.is_admin,
-                'is_lawyer': user.is_lawyer
-            }
+            'user': serialize_user(user),
+            'has_phone': bool(user.phone),
+            'dev_mode': False,
+            'needs_bind': not bool(user.phone)
         })
     except Exception as e:
         current_app.logger.error(f'微信登录出错: {e}')
@@ -180,33 +196,150 @@ def wechat_login():
 @token_required
 def wechat_bind_phone(current_user):
     """
-    绑定手机号到微信账号
-    使用微信小程序的 getPhoneNumber 返回的加密数据
-    注意：需要微信小程序的 appid 和 secret
+    绑定手机号到微信账号（支持短信验证码验证）
+    模式1：phone + sms_code → 短信验证码验证后绑定
+    模式2：encryptedData + iv → 微信 getPhoneNumber 解密绑定
+    模式3：phone (dev-only) → 开发环境直接绑定
+    可选参数：email → 同时更新邮箱
     """
+    from services.sms import check_sms_code
+
     data = request.get_json() or {}
     encrypted_data = data.get('encryptedData', '')
     iv = data.get('iv', '')
+    phone = data.get('phone', '').strip()
+    sms_code = data.get('sms_code', '').strip()
+    email = data.get('email', '').strip()
 
+    # ---- 模式1 & 3：手动输入手机号 ----
+    if phone:
+        if not phone.isdigit() or len(phone) < 5:
+            return jsonify({'error': '手机号格式不正确'}), 400
+
+        # 模式1：短信验证码验证
+        if sms_code:
+            verified = False
+            try:
+                verify_result = check_sms_code(phone, sms_code)
+                if verify_result.get('success') and verify_result.get('verify_result') == 'PASS':
+                    verified = True
+            except Exception as e:
+                current_app.logger.error(f'SMS验证异常: {e}')
+
+            # 开发模式：SMS 验证失败时降级为直接绑定
+            if not verified and not is_dev_mode():
+                return jsonify({'error': '验证码错误或已过期'}), 400
+
+        # 模式3（dev-only）：无验证码也允许绑定
+        elif not is_dev_mode():
+            return jsonify({'error': '请输入短信验证码'}), 400
+
+        # 检查重复
+        existing = User.query.filter_by(phone=phone).first()
+        if existing and existing.id != current_user.id:
+            return jsonify({'error': '该手机号已被其他账号绑定'}), 400
+
+        current_user.phone = phone
+
+        # 绑定成功后，更新用户名为手机号关联的名字
+        if current_user.username in ('新用户',) or current_user.username.startswith('微信用户_') or current_user.username.startswith('mini_'):
+            current_user.username = f'用户_{phone[-4:]}'
+
+        # 更新邮箱（选填）
+        if email:
+            current_user.email = email
+
+        db.session.commit()
+        return jsonify({
+            'ok': True,
+            'user': serialize_user(current_user),
+            'needs_bind': False,
+            'has_phone': True
+        })
+
+    # ---- 模式2：微信 getPhoneNumber 解密 ----
     if not encrypted_data or not iv:
-        return jsonify({'error': '参数不完整'}), 400
+        return jsonify({'error': '请提供手机号或通过微信获取'}), 400
 
     appid = os.environ.get('WX_MINI_APPID', '')
-    secret = os.environ.get('WX_MINI_SECRET', '')
 
-    if not appid or not secret:
-        return jsonify({'error': '微信配置未完成'}), 500
+    session_key = current_user.wx_session_key
+    if not session_key:
+        return jsonify({'error': 'session_key 已过期，请重新登录'}), 400
 
     try:
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-        from cryptography.hazmat.backends import default_backend
+        phone = decrypt_phone_number(encrypted_data, session_key, iv, appid)
+        if not phone:
+            return jsonify({'error': '解密失败，手机号无效'}), 400
 
-        # 获取 session_key（需要额外存储 session_key）
-        # 简化处理：直接让用户输入手机号验证
-        return jsonify({'error': '请使用短信验证绑定手机号'}), 400
+        existing = User.query.filter_by(phone=phone).first()
+        if existing and existing.id != current_user.id:
+            return jsonify({'error': '该手机号已被其他账号绑定'}), 400
+
+        current_user.phone = phone
+        current_user.wx_session_key = None
+
+        # 绑定成功后，更新用户名为手机号关联的名字
+        if current_user.username in ('新用户',) or current_user.username.startswith('微信用户_') or current_user.username.startswith('用户_') or current_user.username.startswith('mini_'):
+            current_user.username = f'用户_{phone[-4:]}'
+
+        if email:
+            current_user.email = email
+
+        db.session.commit()
+        return jsonify({
+            'ok': True,
+            'user': serialize_user(current_user),
+            'needs_bind': False,
+            'has_phone': True
+        })
     except Exception as e:
-        current_app.logger.error(f'绑定手机号出错: {e}')
-        return jsonify({'error': '绑定失败'}), 500
+        current_app.logger.error(f'绑定手机号解密出错: {e}')
+        return jsonify({'error': '手机号获取失败，请重试'}), 500
+
+
+def decrypt_phone_number(encrypted_data, session_key, iv, appid):
+    """
+    微信 getPhoneNumber 数据解密
+    参考微信官方文档：https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/signature.html
+    """
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.backends import default_backend
+
+    try:
+        session_key_bytes = base64.b64decode(session_key)
+        encrypted_bytes = base64.b64decode(encrypted_data)
+        iv_bytes = base64.b64decode(iv)
+
+        cipher = Cipher(
+            algorithms.AES(session_key_bytes),
+            modes.CBC(iv_bytes),
+            backend=default_backend()
+        )
+        decryptor = cipher.decryptor()
+        decrypted_bytes = decryptor.update(encrypted_bytes) + decryptor.finalize()
+
+        # 去除 PKCS7 填充
+        pad = decrypted_bytes[-1]
+        if pad < 1 or pad > 32:
+            return None
+        decrypted_bytes = decrypted_bytes[:-pad]
+
+        decrypted = json.loads(decrypted_bytes.decode('utf-8'))
+
+        watermark = decrypted.get('watermark', {})
+        if watermark.get('appid') != appid:
+            current_app.logger.warning(f'watermark appid 不匹配: {watermark.get("appid")} != {appid}')
+            return None
+
+        phone_number = decrypted.get('phoneNumber', '')
+        if not phone_number:
+            return None
+
+        return phone_number
+    except Exception as e:
+        current_app.logger.error(f'解密手机号异常: {e}')
+        return None
 
 
 # ===================== 账号密码登录（小程序版） =====================
@@ -257,6 +390,7 @@ def mini_register():
     phone = data.get('phone', '').strip()
     password = data.get('password', '').strip()
     sms_code = data.get('sms_code', '').strip()
+    email = data.get('email', '').strip()
 
     if not username:
         return jsonify({'error': '请输入用户名'}), 400
@@ -286,7 +420,7 @@ def mini_register():
     # 创建用户
     user = User(
         username=username,
-        email=f'{phone}@paodinglaw.com',
+        email=email if email else f'{phone}@paodinglaw.com',
         phone=phone
     )
     user.set_password(password)
