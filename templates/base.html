@@ -23,10 +23,10 @@
                 <a href="/documents" class="nav-link">法律文档</a>
                 <a href="/contact" class="nav-link">联系我们</a>
                 {% if current_user.is_authenticated %}
-                    <span class="nav-link nav-user">{{ current_user.username }}</span>
                     {% if current_user.is_admin %}
                         <a href="/admin" class="nav-link admin-link">管理后台</a>
                     {% endif %}
+                    <span class="nav-link nav-user">{{ current_user.username }}</span>
                     <a href="/auth/logout" class="nav-link nav-btn">退出</a>
                 {% else %}
                     <a href="/auth/login" class="nav-link nav-btn">登录</a>

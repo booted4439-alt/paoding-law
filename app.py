@@ -451,7 +451,6 @@ def create_consultation_with_message():
                           content=f'[文件] {f.filename}')
             db.session.add(msg)
 
-    c.status = 'active'
     c.updated_at = datetime.now(timezone.utc)
     db.session.commit()
 
