@@ -401,6 +401,20 @@ def balance_orders():
 @app.route('/balance/invoice', methods=['GET', 'POST'])
 @login_required
 def balance_invoice():
+    from sqlalchemy import func
+    invoices = Invoice.query.filter_by(user_id=current_user.id).order_by(Invoice.created_at.desc()).all()
+    # 计算可开票金额（充值总额 - 赠送总额 - 已开票金额）
+    total_recharge = db.session.query(func.sum(Transaction.amount)).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.type == 'recharge',
+        Transaction.description != '赠送'
+    ).scalar() or 0
+    total_invoiced = db.session.query(func.sum(Invoice.amount)).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.status.in_(['pending', 'issued'])
+    ).scalar() or 0
+    invoiceable = total_recharge - total_invoiced
+
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         tax_id = request.form.get('tax_id', '').strip()
@@ -412,15 +426,20 @@ def balance_invoice():
             amount = 0
         if not title:
             flash('请输入发票抬头', 'error')
-            return render_template('invoice.html')
+            return render_template('invoice.html', invoices=invoices, invoiceable=invoiceable)
+        if amount <= 0:
+            flash('请输入正确的开票金额', 'error')
+            return render_template('invoice.html', invoices=invoices, invoiceable=invoiceable)
+        if amount > invoiceable:
+            flash(f'可开票金额为 {invoiceable/100:.2f} 元（不含赠送部分），请调整金额', 'error')
+            return render_template('invoice.html', invoices=invoices, invoiceable=invoiceable)
         inv = Invoice(user_id=current_user.id, title=title, tax_id=tax_id,
                       amount=amount, order_ids=order_ids, status='pending')
         db.session.add(inv)
         db.session.commit()
         flash('开票申请已提交，请等待审核', 'success')
         return redirect(url_for('balance_invoice'))
-    invoices = Invoice.query.filter_by(user_id=current_user.id).order_by(Invoice.created_at.desc()).all()
-    return render_template('invoice.html', invoices=invoices)
+    return render_template('invoice.html', invoices=invoices, invoiceable=invoiceable)
 
 
 @app.route('/balance/top_up', methods=['GET', 'POST'])
