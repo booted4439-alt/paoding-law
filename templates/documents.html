@@ -43,10 +43,8 @@ function renderDocs(docs) {
     const list = document.getElementById('docs-list');
     list.innerHTML = docs.map(d => `
         <div class="doc-card" onclick="showDoc(${d.id})">
-            <div class="doc-category">${escHtml(d.category)}</div>
             <h4>${escHtml(d.title)}</h4>
-
-            <div class="doc-meta">更新于 ${d.updated_at}</div>
+            <div class="doc-meta">${escHtml(d.category)} | 更新于 ${d.updated_at}</div>
         </div>
     `).join('');
 }
