@@ -1149,7 +1149,6 @@ def admin_get_document(d_id):
         'title': d.title,
         'category': d.category,
         'content': d.content,
-        'summary': d.summary,
         'is_published': d.is_published,
         'updated_at': d.updated_at.strftime('%Y-%m-%d'),
     })
