@@ -1458,6 +1458,7 @@ def admin_list_users():
         'phone': u.phone or '',
         'is_admin': u.is_admin,
         'is_lawyer': u.is_lawyer,
+        'balance': u.balance or 0,
         'created_at': u.created_at.strftime('%Y-%m-%d %H:%M'),
     } for u in q])
 

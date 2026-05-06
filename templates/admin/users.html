@@ -49,6 +49,10 @@
                 <label>手机 *</label>
                 <input type="text" id="user-phone" maxlength="11" required>
             </div>
+            <div class="form-group">
+                <label>当前余额（不可编辑）</label>
+                <div id="user-balance" style="padding: 8px 0; font-weight: 600; color: #1a73e8;">-</div>
+            </div>
             <div class="form-row">
                 <div class="form-group">
                     <label><input type="checkbox" id="user-is_admin"> 管理员</label>
@@ -72,13 +76,14 @@ function loadUsers() {
         .then(users => {
             const table = document.getElementById('admin-users-table');
             table.innerHTML = `<table>
-                <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>手机</th><th>角色</th><th>注册时间</th><th>操作</th></tr></thead>
+                <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>手机</th><th>余额</th><th>角色</th><th>注册时间</th><th>操作</th></tr></thead>
                 <tbody>
                     ${users.map(u => `<tr>
                         <td>${u.id}</td>
                         <td>${escHtml(u.username)}</td>
                         <td>${escHtml(u.email)}</td>
                         <td>${u.phone || '-'}</td>
+                        <td style="font-weight:500;">${(u.balance / 100).toFixed(2)}</td>
                         <td>${roleBadge(u)}</td>
                         <td>${u.created_at}</td>
                         <td>
@@ -108,7 +113,7 @@ function showUserForm(data) {
     document.getElementById('user-phone').value = data ? (data.phone || '') : '';
     document.getElementById('user-is_admin').checked = data ? data.is_admin : false;
     document.getElementById('user-is_lawyer').checked = data ? data.is_lawyer : false;
-    document.getElementById('pw-hint').textContent = data ? '(留空不修改)' : '(新建时必填)';
+    document.getElementById('user-balance').textContent = data ? (data.balance / 100).toFixed(2) + ' 元' : '-';
     document.getElementById('user-password').required = !data;
     document.getElementById('user-modal').style.display = 'flex';
 }
