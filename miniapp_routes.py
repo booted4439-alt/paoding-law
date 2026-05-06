@@ -118,7 +118,7 @@ def wechat_login():
         if not user:
             user = User(
                 username=uname,
-                email=f'dev_{code_tag}@paodinglaw.com',
+                email=None,
                 phone=None
             )
             user.set_password(code[:16])
@@ -165,7 +165,7 @@ def wechat_login():
             uname = nickname if nickname else '新用户'
             user = User(
                 username=uname,
-                email=f'{openid}@wechat.paodinglaw.com',
+                email=None,
                 openid=openid,
                 wx_session_key=session_key,
                 phone=None
@@ -385,6 +385,7 @@ def mini_login():
 @mini_app.route('/api/miniapp/register', methods=['POST'])
 def mini_register():
     """注册并直接返回 token"""
+    import re
     data = request.get_json() or {}
     username = data.get('username', '').strip()
     phone = data.get('phone', '').strip()
@@ -398,6 +399,8 @@ def mini_register():
         return jsonify({'error': '请填写手机号和密码'}), 400
     if len(password) < 6:
         return jsonify({'error': '密码至少6位'}), 400
+    if not re.match(r'^[a-zA-Z0-9]+$', password):
+        return jsonify({'error': '密码只能包含字母和数字'}), 400
 
     # 验证短信验证码
     if phone and sms_code:
@@ -420,7 +423,7 @@ def mini_register():
     # 创建用户
     user = User(
         username=username,
-        email=email if email else f'{phone}@paodinglaw.com',
+        email=email or None,
         phone=phone
     )
     user.set_password(password)

@@ -15,14 +15,14 @@
     <form method="post" id="form-password" style="display: {{ 'none' if login_mode == 'sms' else 'block' }}">
         <input type="hidden" name="login_mode" value="password">
         <div class="form-group">
-            <label>手机号</label>
-            <input type="tel" name="phone" required pattern="1\d{10}" placeholder="11位手机号" maxlength="11">
+            <input type="tel" name="phone" required pattern="1\d{10}" placeholder="手机号码（11位）" maxlength="11">
         </div>
         <div class="form-group">
-            <label>密码</label>
             <div class="pwd-field">
-                <input type="password" name="password" id="login-pwd" required>
-                <button type="button" class="pwd-toggle" onclick="togglePwd('login-pwd', this)">显示</button>
+                <input type="password" name="password" id="login-pwd" required placeholder="密码">
+                <button type="button" class="pwd-toggle" onclick="togglePwd('login-pwd', this)" aria-label="切换密码可见性">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.0146 8.3086C11.7816 13.697 4.21836 13.697 0.98532 8.3086C0.871428 8.11866 0.871431 7.88135 0.98532 7.69141C4.21836 2.30301 11.7816 2.303 15.0146 7.69141C15.1285 7.88135 15.1285 8.11866 15.0146 8.3086ZM2.21091 8C5.00794 12.1994 10.9932 12.1997 13.79 8C10.9932 3.80031 5.00794 3.80061 2.21091 8Z" fill="currentColor"/><path d="M9.40036 8C9.40036 7.2268 8.77317 6.59961 7.99997 6.59961C7.22677 6.59961 6.59958 7.2268 6.59958 8C6.59958 8.7732 7.22677 9.40039 7.99997 9.40039C8.77317 9.40039 9.40036 8.7732 9.40036 8ZM10.5996 8C10.5996 9.43594 9.43591 10.5996 7.99997 10.5996C6.56403 10.5996 5.40036 9.43594 5.40036 8C5.40036 6.56406 6.56403 5.40039 7.99997 5.40039C9.43591 5.40039 10.5996 6.56406 10.5996 8Z" fill="currentColor"/></svg>
+                </button>
             </div>
         </div>
         <button type="submit" class="btn btn-primary btn-block">登录</button>
@@ -32,13 +32,11 @@
     <form method="post" id="form-sms" style="display: {{ 'block' if login_mode == 'sms' else 'none' }}">
         <input type="hidden" name="login_mode" value="sms">
         <div class="form-group">
-            <label>手机号</label>
-            <input type="tel" name="phone" required pattern="1\d{10}" placeholder="11位手机号" maxlength="11" id="sms-phone">
+            <input type="tel" name="phone" required pattern="1\d{10}" placeholder="手机号码（11位）" maxlength="11" id="sms-phone">
         </div>
         <div class="form-group">
-            <label>验证码</label>
             <div class="input-row">
-                <input type="text" name="sms_code" required maxlength="6" placeholder="6位验证码" style="flex:1;">
+                <input type="text" name="sms_code" required maxlength="6" placeholder="速通互联验证码" style="flex:1;">
                 <button type="button" class="code-btn" id="send-code-btn" onclick="sendSmsCode()">获取验证码</button>
             </div>
         </div>

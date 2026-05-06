@@ -27,6 +27,7 @@ from werkzeug.utils import secure_filename
 from config import Config
 from models import db, User, Consultation, Message, LegalDocument, SiteSetting
 from services.sms import send_sms_code, check_sms_code, generate_code
+from services.mailer import notify_new_message
 
 # ---------- app init ----------
 app = Flask(__name__)
@@ -64,6 +65,12 @@ def get_setting(key, default=''):
     return SiteSetting.get(key, default)
 
 
+def validate_password(pwd):
+    """密码只能包含字母和数字"""
+    import re
+    return bool(re.match(r'^[a-zA-Z0-9]+$', pwd))
+
+
 def allowed_file(filename):
     return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
@@ -95,7 +102,7 @@ def init_db():
     # seed admin
     if not User.query.filter_by(username='admin').first():
         admin = User(username='admin', email='admin@paodinglaw.com',
-                     is_admin=True, is_lawyer=True)
+                     phone='13800000000', is_admin=True, is_lawyer=True)
         admin.set_password('admin123')
         db.session.add(admin)
     # seed default settings
@@ -262,6 +269,11 @@ def auth_register():
         phone = request.form.get('phone', '').strip()
         sms_code = request.form.get('sms_code', '').strip()
 
+        # 密码校验
+        if password and not validate_password(password):
+            flash('密码只能包含字母和数字', 'error')
+            return render_template('register.html')
+
         # 核验短信验证码
         if phone and sms_code:
             verify_result = check_sms_code(phone, sms_code)
@@ -272,9 +284,7 @@ def auth_register():
             flash('请完成手机验证', 'error')
             return render_template('register.html')
 
-        if User.query.filter_by(email=email).first():
-            flash('邮箱已注册', 'error')
-        elif User.query.filter_by(phone=phone).first():
+        if phone and User.query.filter_by(phone=phone).first():
             flash('该手机号已注册', 'error')
         else:
             user = User(username=username, email=email, phone=phone)
@@ -409,9 +419,30 @@ def create_consultation():
     description = data.get('description', '').strip()
     if not title:
         return jsonify({'error': '请输入咨询标题'}), 400
+    if not current_user.phone and not current_user.is_admin:
+        return jsonify({'error': '请先绑定手机号'}), 403
     c = Consultation(title=title, description=description, user_id=current_user.id)
     db.session.add(c)
+    db.session.flush()
+
+    # 创建首条消息
+    if description:
+        msg = Message(consultation_id=c.id, sender_id=current_user.id, content=description)
+        db.session.add(msg)
     db.session.commit()
+
+    # 普通用户新建咨询 → 邮件通知
+    if not current_user.is_admin and not current_user.is_lawyer and description:
+        contact_email = SiteSetting.get('contact_email') or SiteSetting.get('email')
+        if contact_email:
+            try:
+                from services.mailer import send_email
+                subject = f'新咨询 - {title}'
+                body = f'用户 {current_user.username}（{current_user.phone or "未绑定手机"}）提交了新咨询。\n\n标题: {title}\n内容: {description}\n\n查看详情：https://paodinglaw.com/admin/consultations/{c.id}'
+                send_email(contact_email, subject, body)
+            except Exception as e:
+                print(f'[EMAIL] 通知发送失败: {e}')
+
     return jsonify({'id': c.id, 'title': c.title}), 201
 
 
@@ -425,6 +456,8 @@ def create_consultation_with_message():
         title = content[:50] if content else '法律咨询'
     if not content:
         return jsonify({'error': '请输入您的问题'}), 400
+    if not current_user.phone and not current_user.is_admin:
+        return jsonify({'error': '请先绑定手机号'}), 403
 
     # Validate limits
     files = request.files.getlist('file')
@@ -453,6 +486,15 @@ def create_consultation_with_message():
 
     c.updated_at = datetime.now(timezone.utc)
     db.session.commit()
+
+    # 普通用户新建咨询 → 邮件通知联系邮箱
+    if not current_user.is_admin and not current_user.is_lawyer:
+        contact_email = SiteSetting.get('contact_email') or SiteSetting.get('email')
+        if contact_email:
+            try:
+                notify_new_message(c, msg, current_user, contact_email)
+            except Exception as e:
+                print(f'[EMAIL] 通知发送失败: {e}')
 
     # broadcast
     msgs = Message.query.filter_by(consultation_id=c.id).order_by(Message.created_at.asc()).all()
@@ -571,6 +613,8 @@ def send_message(c_id):
     c = db.session.get(Consultation, c_id)
     if not c or (c.user_id != current_user.id and not current_user.is_lawyer):
         return jsonify({'error': '无权限'}), 403
+    if not current_user.phone and not current_user.is_admin and not current_user.is_lawyer:
+        return jsonify({'error': '请先绑定手机号'}), 403
     content = (request.form.get('content') or '').strip()
     files = request.files.getlist('file')
 
@@ -597,10 +641,35 @@ def send_message(c_id):
                           content=f'[文件] {f.filename}')
             db.session.add(msg)
 
-    if c.status == 'pending':
+    if c.status == 'pending' and (current_user.is_admin or current_user.is_lawyer):
         c.status = 'active'
     c.updated_at = datetime.now(timezone.utc)
     db.session.commit()
+
+    # 普通用户发消息 → 通知联系邮箱
+    if not current_user.is_admin and not current_user.is_lawyer:
+        contact_email = SiteSetting.get('contact_email') or SiteSetting.get('email')
+        if contact_email:
+            try:
+                notify_new_message(c, msg, current_user, contact_email)
+            except Exception as e:
+                print(f'[EMAIL] 通知失败: {e}')
+
+    # 律师/管理员回复 → 通知咨询发起用户（有邮箱的）
+    if current_user.is_admin or current_user.is_lawyer:
+        owner = db.session.get(User, c.user_id)
+        if owner and owner.email:
+            try:
+                from services.mailer import send_email
+                subject = f'律师回复 - {c.title or "法律咨询"}'
+                body = (
+                    f'{current_user.username} 回复了您的咨询「{c.title or "法律咨询"}」。\n\n'
+                    f'回复内容：{msg.content or "(文件消息)"}\n\n'
+                    f'点击查看：https://paodinglaw.com/consult/{c.id}'
+                )
+                send_email(owner.email, subject, body)
+            except Exception as e:
+                print(f'[EMAIL] 通知用户失败: {e}')
 
     # real-time broadcast all new messages
     new_msgs = Message.query.filter_by(consultation_id=c_id).order_by(Message.id.desc()).limit(len(files) + (1 if content else 0)).all()
@@ -894,10 +963,10 @@ def admin_create_user():
     is_admin = data.get('is_admin', False)
     is_lawyer = data.get('is_lawyer', False)
 
-    if not username or not email or not password:
-        return jsonify({'error': '用户名、邮箱、密码为必填'}), 400
-    if User.query.filter_by(email=email).first():
-        return jsonify({'error': '邮箱已注册'}), 400
+    if not username or not password:
+        return jsonify({'error': '用户名、密码为必填'}), 400
+    if not validate_password(password):
+        return jsonify({'error': '密码只能包含字母和数字'}), 400
     if phone and User.query.filter_by(phone=phone).first():
         return jsonify({'error': '手机号已注册'}), 400
 
@@ -923,11 +992,8 @@ def admin_update_user(u_id):
         if u and u.id != user.id:
             return jsonify({'error': '用户名已存在'}), 400
         user.username = data['username'].strip()
-    if 'email' in data and data['email'].strip():
-        u = User.query.filter_by(email=data['email'].strip()).first()
-        if u and u.id != user.id:
-            return jsonify({'error': '邮箱已注册'}), 400
-        user.email = data['email'].strip()
+    if 'email' in data:
+        user.email = data['email'].strip() or None
     if 'phone' in data:
         p = data['phone'].strip() or None
         if p:
