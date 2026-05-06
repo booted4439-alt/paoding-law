@@ -1165,7 +1165,6 @@ def admin_create_document():
         title=data.get('title', '').strip(),
         category=data.get('category', 'general').strip(),
         content=data.get('content', ''),
-        summary=data.get('summary', '').strip(),
         is_published=data.get('is_published', True),
     )
     db.session.add(d)
@@ -1181,7 +1180,7 @@ def admin_update_document(d_id):
     if not d:
         return jsonify({'error': '未找到'}), 404
     data = request.get_json() or {}
-    for field in ('title', 'category', 'content', 'summary'):
+    for field in ('title', 'category', 'content'):
         if field in data:
             setattr(d, field, data[field])
     if 'is_published' in data:

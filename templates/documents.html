@@ -45,7 +45,7 @@ function renderDocs(docs) {
         <div class="doc-card" onclick="showDoc(${d.id})">
             <div class="doc-category">${escHtml(d.category)}</div>
             <h4>${escHtml(d.title)}</h4>
-            ${d.summary ? `<p>${escHtml(d.summary)}</p>` : ''}
+
             <div class="doc-meta">更新于 ${d.updated_at}</div>
         </div>
     `).join('');
@@ -55,7 +55,7 @@ function searchDocs() {
     const q = document.getElementById('doc-search').value.trim();
     if (!q) return renderDocs(allDocs);
     const filtered = allDocs.filter(d =>
-        d.title.includes(q) || (d.summary && d.summary.includes(q))
+        d.title.includes(q)
     );
     renderDocs(filtered);
 }

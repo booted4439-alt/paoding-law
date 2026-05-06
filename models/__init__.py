@@ -73,7 +73,6 @@ class LegalDocument(db.Model):
     title = db.Column(db.String(300), nullable=False)
     category = db.Column(db.String(100), default='general')
     content = db.Column(db.Text, nullable=False)
-    summary = db.Column(db.Text)
     is_published = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now,
