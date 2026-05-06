@@ -1021,7 +1021,6 @@ def api_documents():
         'id': d.id,
         'title': d.title,
         'category': d.category,
-        'summary': d.summary,
         'updated_at': d.updated_at.strftime('%Y-%m-%d'),
     } for d in q.all()])
 
