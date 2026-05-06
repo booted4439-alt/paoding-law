@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}充值管理 — 庖丁法律服务{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <nav class="admin-sidebar" id="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="/admin" class="admin-nav-link">概览</a>
+        <a href="/admin/consultations" class="admin-nav-link">咨询管理</a>
+        <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/users" class="admin-nav-link">用户管理</a>
+        <a href="/admin/recharges" class="admin-nav-link active">充值管理</a>
+        <a href="/admin/prices" class="admin-nav-link">价格管理</a>
+        <a href="/admin/invoices" class="admin-nav-link">发票管理</a>
+        <a href="/admin/settings" class="admin-nav-link">网站设置</a>
+    </nav>
+    <div class="admin-main">
+        <div class="admin-header">
+            <div class="admin-header-left"><h2>充值管理</h2></div>
+            <div class="admin-header-right"><a href="/" class="top-home-link">庖丁首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
+        </div>
+
+        <!-- 调账 -->
+        <div style="margin: 16px 0;">
+            <button class="btn btn-outline btn-sm" onclick="showAdjustModal()">⚡ 手动调账</button>
+        </div>
+
+        <!-- Tab -->
+        <div class="admin-filters">
+            <button class="filter-btn active" onclick="loadRecharges('', this)">全部</button>
+            <button class="filter-btn" onclick="loadRecharges('pending', this)">待审核</button>
+            <button class="filter-btn" onclick="loadRecharges('success', this)">已通过</button>
+            <button class="filter-btn" onclick="loadRecharges('failed', this)">已驳回</button>
+        </div>
+
+        <div id="recharges-table" class="admin-table"></div>
+    </div>
+</div>
+
+<!-- 调账 Modal -->
+<div class="modal" id="adjust-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>手动调账</h3>
+            <button class="modal-close" onclick="closeModal('adjust-modal')">&times;</button>
+        </div>
+        <form id="adjust-form">
+            <div class="form-group">
+                <label>用户ID</label>
+                <input type="number" name="user_id" required placeholder="输入用户ID">
+            </div>
+            <div class="form-group">
+                <label>金额（分，正数增加，负数减少）</label>
+                <input type="number" name="amount" required placeholder="例如：5000 表示增加50元">
+            </div>
+            <div class="form-group">
+                <label>原因</label>
+                <input type="text" name="reason" placeholder="调账原因">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="closeModal('adjust-modal')">取消</button>
+                <button type="submit" class="btn btn-primary">确认调账</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function loadRecharges(status, el) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    const url = status ? `/admin/api/recharges?status=${status}` : '/admin/api/recharges';
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('recharges-table');
+            if (data.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 48px; color: var(--text-muted);">暂无记录</div>';
+                return;
+            }
+            let html = '<table><thead><tr><th>订单号</th><th>用户</th><th>金额</th><th>方式</th><th>状态</th><th>凭证</th><th>备注</th><th>审核人</th><th>时间</th><th>操作</th></tr></thead><tbody>';
+            data.forEach(o => {
+                const statusMap = {pending: '待审核', success: '已通过', failed: '已驳回'};
+                const statusColor = {pending: '#856404', success: 'var(--success)', failed: 'var(--danger)'};
+                const statusBg = {pending: '#fff3cd', success: '#e6f4ea', failed: '#fce8e6'};
+                html += `<tr>
+                    <td style="font-size: 0.8rem;">${o.order_no}</td>
+                    <td>${o.username}</td>
+                    <td style="font-weight: 500;">${(o.amount / 100).toFixed(2)}</td>
+                    <td>${o.payment_method === 'manual' ? '转账' : o.payment_method === 'alipay' ? '支付宝' : '微信'}</td>
+                    <td><span style="background: ${statusBg[o.status]}; color: ${statusColor[o.status]}; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">${statusMap[o.status] || o.status}</span></td>
+                    <td>${o.voucher_url ? `<a href="${o.voucher_url}" target="_blank">查看凭证</a>` : '-'}</td>
+                    <td>${o.remark || '-'}</td>
+                    <td>${o.admin_username || '-'}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">${o.created_at}</td>
+                    <td>${o.status === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="approve(${o.id})">通过</button><button class="btn btn-sm btn-danger" onclick="reject(${o.id})">驳回</button>` : '-'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        });
+}
+
+function approve(id) {
+    if (!confirm('确认通过该充值申请？')) return;
+    fetch(`/admin/recharges/${id}/approve`, {method: 'POST'})
+        .then(r => r.json())
+        .then(d => { if (d.ok) { alert('已通过，用户余额已增加'); loadRecharges('pending', document.querySelector('.filter-btn.active')); } })
+        .catch(e => alert('操作失败'));
+}
+
+function reject(id) {
+    const reason = prompt('驳回原因（选填）：');
+    fetch(`/admin/recharges/${id}/reject`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({remark: reason || ''})
+    })
+        .then(r => r.json())
+        .then(d => { if (d.ok) { alert('已驳回'); loadRecharges('pending', document.querySelector('.filter-btn.active')); } })
+        .catch(e => alert('操作失败'));
+}
+
+function showAdjustModal() {
+    document.getElementById('adjust-modal').style.display = 'flex';
+}
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+document.getElementById('adjust-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(this));
+    data.amount = parseInt(data.amount);
+    data.user_id = parseInt(data.user_id);
+    fetch('/admin/adjust_balance', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                alert(`调账成功，用户当前余额：${(d.new_balance / 100).toFixed(2)} 元`);
+                closeModal('adjust-modal');
+                loadRecharges('', document.querySelector('.admin-filters .filter-btn:first-child'));
+            } else { alert(d.error || '调账失败'); }
+        })
+        .catch(e => alert('调账失败'));
+});
+
+loadRecharges('pending', document.querySelector('.admin-filters .filter-btn:nth-child(2)'));
+</script>
+{% endblock %}

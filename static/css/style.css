@@ -1228,7 +1228,33 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
     .chat-empty-input form { padding: 6px 6px 6px 12px; }
 }
 
-/* Homepage mobile nav toggle */
+/* ===================== PRICING / BALANCE / INVOICE ===================== */
+.pricing-card { transition: all 0.2s; }
+.pricing-card:hover { border-color: var(--primary) !important; box-shadow: var(--shadow); }
+
+.quick-amount { transition: all 0.15s; cursor: pointer; }
+.quick-amount:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+.tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 500;
+}
+
+.balance-header { background: linear-gradient(135deg, var(--primary), #1557b0); border-radius: var(--radius); padding: 32px; color: #fff; }
+
+/* ===================== Homepage mobile nav toggle */
 @media (max-width: 768px) {
     .nav-toggle { display: flex; }
     .nav-links { display: none; flex-direction: column; position: absolute; top: 64px; left: 0; right: 0; background: var(--bg); border-bottom: 1px solid var(--border-light); padding: 16px; }

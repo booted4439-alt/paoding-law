@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}发票管理 — 庖丁法律服务{% endblock %}
+{% block body_class %}{% endblock %}
+{% block nav_class %}nav-visible{% endblock %}
+{% block footer_class %}{% endblock %}
+{% block content %}
+<div class="invoice-page" style="max-width: 800px; margin: 0 auto; padding: 40px 24px;">
+    <a href="/balance" class="btn btn-outline btn-sm" style="margin-bottom: 24px;">← 返回余额</a>
+    <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 24px;">发票管理</h1>
+
+    <!-- 申请开票 -->
+    <div style="border: 1px solid var(--border-light); border-radius: var(--radius); padding: 32px; margin-bottom: 32px;">
+        <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;">申请开票</h2>
+        <form method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>发票抬头 *</label>
+                    <input type="text" name="title" required placeholder="个人姓名或公司名称">
+                </div>
+                <div class="form-group">
+                    <label>税号</label>
+                    <input type="text" name="tax_id" placeholder="统一社会信用代码（企业必填）">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>开票金额（元）</label>
+                    <input type="number" name="amount" step="0.01" min="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label>关联订单ID（选填）</label>
+                    <input type="text" name="order_ids" placeholder="多个用逗号分隔">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">提交申请</button>
+        </form>
+    </div>
+
+    <!-- 历史发票 -->
+    <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;">历史发票</h2>
+    {% if invoices %}
+    <div style="border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden;">
+        <div class="admin-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>抬头</th>
+                        <th>金额</th>
+                        <th>状态</th>
+                        <th>申请时间</th>
+                        <th>发票文件</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in invoices %}
+                    <tr>
+                        <td>{{ inv.title }}</td>
+                        <td>{{ '%.2f'|format(inv.amount/100) }} 元</td>
+                        <td>
+                            {% if inv.status == 'pending' %}
+                            <span style="background: #fff3cd; color: #856404; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">待开票</span>
+                            {% elif inv.status == 'issued' %}
+                            <span style="background: #e6f4ea; color: var(--success); padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">已开票</span>
+                            {% else %}
+                            <span style="background: #e2e3e5; color: #383d41; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">已取消</span>
+                            {% endif %}
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.85rem;">{{ inv.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if inv.file_url %}
+                            <a href="{{ inv.file_url }}" target="_blank" class="btn btn-sm btn-outline">下载</a>
+                            {% else %}
+                            <span style="color: var(--text-muted); font-size: 0.85rem;">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 48px; border: 1px solid var(--border-light); border-radius: var(--radius); color: var(--text-muted);">
+        暂无开票记录
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

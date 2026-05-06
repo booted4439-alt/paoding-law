@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 
 from config import Config
 from models import db, User, Consultation, Message, LegalDocument, SiteSetting
+from models import RechargeOrder, Transaction, ServicePrice, Invoice, ServiceOrder
 from services.sms import send_sms_code, check_sms_code, generate_code
 from services.mailer import notify_new_message
 
@@ -364,6 +365,138 @@ def contact():
     return render_template('contact.html')
 
 
+# ===================== PRICING =====================
+@app.route('/pricing')
+def pricing():
+    prices = ServicePrice.query.filter_by(is_active=True).order_by(ServicePrice.sort_order).all()
+    categories = {}
+    for p in prices:
+        categories.setdefault(p.category, []).append(p)
+    return render_template('pricing.html', categories=categories)
+
+
+# ===================== BALANCE =====================
+@app.route('/balance')
+@login_required
+def balance():
+    return render_template('balance.html')
+
+
+@app.route('/balance/orders')
+@login_required
+def balance_orders():
+    return render_template('orders.html')
+
+
+@app.route('/balance/invoice', methods=['GET', 'POST'])
+@login_required
+def balance_invoice():
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        tax_id = request.form.get('tax_id', '').strip()
+        amount_str = request.form.get('amount', '0').strip()
+        order_ids = request.form.get('order_ids', '').strip()
+        try:
+            amount = int(float(amount_str) * 100)
+        except ValueError:
+            amount = 0
+        if not title:
+            flash('请输入发票抬头', 'error')
+            return render_template('invoice.html')
+        inv = Invoice(user_id=current_user.id, title=title, tax_id=tax_id,
+                      amount=amount, order_ids=order_ids, status='pending')
+        db.session.add(inv)
+        db.session.commit()
+        flash('开票申请已提交，请等待审核', 'success')
+        return redirect(url_for('balance_invoice'))
+    invoices = Invoice.query.filter_by(user_id=current_user.id).order_by(Invoice.created_at.desc()).all()
+    return render_template('invoice.html', invoices=invoices)
+
+
+@app.route('/balance/top_up', methods=['GET', 'POST'])
+@login_required
+def balance_top_up():
+    if request.method == 'POST':
+        amount_str = request.form.get('amount', '0').strip()
+        payment_method = request.form.get('payment_method', 'manual')
+        remark = request.form.get('remark', '').strip()
+        try:
+            amount = int(float(amount_str) * 100)
+        except ValueError:
+            flash('请输入正确的金额', 'error')
+            return render_template('top_up.html')
+        if amount < 1:
+            flash('请输入正确的金额', 'error')
+            return render_template('top_up.html')
+
+        import uuid
+        order_no = 'CZ' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+        order = RechargeOrder(user_id=current_user.id, order_no=order_no,
+                              amount=amount, payment_method=payment_method,
+                              status='pending', remark=remark)
+
+        # Handle voucher upload
+        voucher = request.files.get('voucher')
+        if voucher and voucher.filename:
+            if allowed_file(voucher.filename):
+                ext = voucher.filename.rsplit('.', 1)[1].lower()
+                filename = f'voucher_{uuid.uuid4().hex}.{ext}'
+                voucher.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                order.voucher_url = url_for('uploaded_file', filename=filename)
+
+        db.session.add(order)
+        db.session.commit()
+        flash('充值申请已提交，请等待管理员审核', 'success')
+        return redirect(url_for('balance_orders'))
+
+    return render_template('top_up.html')
+
+
+@app.route('/api/balance')
+@login_required
+def api_balance():
+    """余额和交易记录"""
+    tx_type = request.args.get('type', '')
+    page = request.args.get('page', 1, type=int)
+    q = Transaction.query.filter_by(user_id=current_user.id)
+    if tx_type:
+        q = q.filter_by(type=tx_type)
+    q = q.order_by(Transaction.created_at.desc())
+    pagination = q.paginate(page=page, per_page=Config.ITEMS_PER_PAGE, error_out=False)
+    return jsonify({
+        'balance': current_user.balance,
+        'transactions': [{
+            'id': t.id,
+            'type': t.type,
+            'amount': t.amount,
+            'balance_before': t.balance_before,
+            'balance_after': t.balance_after,
+            'service_type': t.service_type,
+            'description': t.description,
+            'created_at': t.created_at.strftime('%Y-%m-%d %H:%M'),
+        } for t in pagination.items],
+        'total': pagination.total,
+        'pages': pagination.pages,
+        'current': page,
+    })
+
+
+@app.route('/api/balance/recharge_orders')
+@login_required
+def api_recharge_orders():
+    orders = RechargeOrder.query.filter_by(user_id=current_user.id).order_by(RechargeOrder.created_at.desc()).all()
+    return jsonify([{
+        'id': o.id,
+        'order_no': o.order_no,
+        'amount': o.amount,
+        'payment_method': o.payment_method,
+        'status': o.status,
+        'voucher_url': o.voucher_url,
+        'remark': o.remark,
+        'created_at': o.created_at.strftime('%Y-%m-%d %H:%M'),
+    } for o in orders])
+
+
 # ===================== CONSULTATION =====================
 @app.route('/consult')
 @login_required
@@ -655,8 +788,57 @@ def send_message(c_id):
             except Exception as e:
                 print(f'[EMAIL] 通知失败: {e}')
 
-    # 律师/管理员回复 → 通知咨询发起用户（有邮箱的）
+    # 律师/管理员回复 → 扣费检查 + 通知咨询发起用户
     if current_user.is_admin or current_user.is_lawyer:
+        # 检查用户余额并扣费（每次律师回复扣一次费）
+        if c.status != 'pending':
+            try:
+                # 查找该咨询对应的有效服务价格
+                price = ServicePrice.query.filter_by(
+                    category='consult', is_active=True
+                ).order_by(ServicePrice.sort_order).first()
+                if price and price.price > 0:
+                    owner = db.session.get(User, c.user_id)
+                    if owner and not owner.is_admin and not owner.is_lawyer:
+                        # 查找此咨询的ServiceOrder
+                        so = ServiceOrder.query.filter_by(
+                            consultation_id=c.id, user_id=c.user_id
+                        ).first()
+                        if not so:
+                            so = ServiceOrder(
+                                user_id=c.user_id,
+                                service_type='consult',
+                                price_id=price.id,
+                                amount=0,
+                                status='pending',
+                                consultation_id=c.id,
+                                description=f'咨询回复计费：{c.title}'
+                            )
+                            db.session.add(so)
+                            db.session.flush()
+
+                        # 每次律师回复扣费
+                        fee = price.price
+                        if owner.balance >= fee:
+                            before = owner.balance
+                            owner.balance -= fee
+                            so.amount += fee
+                            so.lawyer_reply_count += 1
+                            so.status = 'paid' if so.lawyer_reply_count > 0 else so.status
+                            tx = Transaction(
+                                user_id=owner.id,
+                                type='consume',
+                                amount=-fee,
+                                balance_before=before,
+                                balance_after=owner.balance,
+                                service_type='consult',
+                                description=f'律师回复扣费 {fee/100:.2f} 元'
+                            )
+                            db.session.add(tx)
+            except Exception as e:
+                app.logger.error(f'扣费失败: {e}')
+
+        # 通知咨询发起用户（有邮箱的）
         owner = db.session.get(User, c.user_id)
         if owner and owner.email:
             try:
@@ -924,6 +1106,230 @@ def admin_save_settings():
     data = request.get_json() or {}
     for k, v in data.items():
         SiteSetting.set(k, v)
+    return jsonify({'ok': True})
+
+
+# ===================== ADMIN: RECHARGE MANAGEMENT =====================
+@app.route('/admin/recharges')
+@login_required
+@admin_required
+def admin_recharges():
+    return render_template('admin/recharges.html')
+
+
+@app.route('/admin/api/recharges')
+@login_required
+@admin_required
+def admin_list_recharges():
+    status = request.args.get('status', '')
+    q = RechargeOrder.query
+    if status:
+        q = q.filter_by(status=status)
+    q = q.order_by(RechargeOrder.created_at.desc()).all()
+    users = {u.id: u for u in User.query.all()}
+    return jsonify([{
+        'id': o.id,
+        'order_no': o.order_no,
+        'user_id': o.user_id,
+        'username': users[o.user_id].username if o.user_id in users else '未知',
+        'amount': o.amount,
+        'payment_method': o.payment_method,
+        'status': o.status,
+        'voucher_url': o.voucher_url,
+        'remark': o.remark,
+        'admin_username': users[o.admin_id].username if o.admin_id and o.admin_id in users else None,
+        'created_at': o.created_at.strftime('%Y-%m-%d %H:%M'),
+    } for o in q])
+
+
+@app.route('/admin/recharges/<int:oid>/approve', methods=['POST'])
+@login_required
+@admin_required
+def admin_approve_recharge(oid):
+    order = db.session.get(RechargeOrder, oid)
+    if not order or order.status != 'pending':
+        return jsonify({'error': '订单状态错误'}), 400
+    order.status = 'success'
+    order.admin_id = current_user.id
+
+    user = db.session.get(User, order.user_id)
+    before = user.balance
+    user.balance += order.amount
+
+    tx = Transaction(user_id=order.user_id, type='recharge', amount=order.amount,
+                     balance_before=before, balance_after=user.balance,
+                     order_id=order.id, description=f'充值 {order.amount/100:.2f} 元')
+    db.session.add(tx)
+    db.session.commit()
+    return jsonify({'ok': True, 'new_balance': user.balance})
+
+
+@app.route('/admin/recharges/<int:oid>/reject', methods=['POST'])
+@login_required
+@admin_required
+def admin_reject_recharge(oid):
+    order = db.session.get(RechargeOrder, oid)
+    if not order or order.status != 'pending':
+        return jsonify({'error': '订单状态错误'}), 400
+    order.status = 'failed'
+    order.admin_id = current_user.id
+    data = request.get_json() or {}
+    order.remark = data.get('remark', order.remark or '')
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/adjust_balance', methods=['POST'])
+@login_required
+@admin_required
+def admin_adjust_balance():
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    amount = data.get('amount', 0)  # 单位：分，可正可负
+    reason = data.get('reason', '').strip()
+    if not user_id or not amount:
+        return jsonify({'error': '参数不完整'}), 400
+    user = db.session.get(User, int(user_id))
+    if not user:
+        return jsonify({'error': '用户未找到'}), 404
+    before = user.balance
+    user.balance += int(amount)
+    if user.balance < 0:
+        user.balance = 0
+    tt = 'adjust' if amount >= 0 else 'refund'
+    tx = Transaction(user_id=user.id, type=tt, amount=amount,
+                     balance_before=before, balance_after=user.balance,
+                     description=reason or '管理员调账')
+    db.session.add(tx)
+    db.session.commit()
+    return jsonify({'ok': True, 'new_balance': user.balance})
+
+
+# ===================== ADMIN: SERVICE PRICES =====================
+@app.route('/admin/prices')
+@login_required
+@admin_required
+def admin_prices():
+    return render_template('admin/prices.html')
+
+
+@app.route('/admin/api/prices', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_prices():
+    prices = ServicePrice.query.order_by(ServicePrice.sort_order).all()
+    return jsonify([{
+        'id': p.id,
+        'name': p.name,
+        'category': p.category,
+        'price': p.price,
+        'description': p.description or '',
+        'sort_order': p.sort_order,
+        'is_active': p.is_active,
+    } for p in prices])
+
+
+@app.route('/admin/api/prices', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_price():
+    data = request.get_json() or {}
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': '名称必填'}), 400
+    price = ServicePrice(
+        name=name,
+        category=data.get('category', 'consult'),
+        price=int(float(data.get('price', 0)) * 100),
+        description=data.get('description', '').strip(),
+        sort_order=data.get('sort_order', 0),
+        is_active=data.get('is_active', True),
+    )
+    db.session.add(price)
+    db.session.commit()
+    return jsonify({'id': price.id}), 201
+
+
+@app.route('/admin/api/prices/<int:pid>', methods=['PUT'])
+@login_required
+@admin_required
+def admin_update_price(pid):
+    price = db.session.get(ServicePrice, pid)
+    if not price:
+        return jsonify({'error': '未找到'}), 404
+    data = request.get_json() or {}
+    if 'name' in data:
+        price.name = data['name'].strip()
+    if 'category' in data:
+        price.category = data['category']
+    if 'price' in data:
+        price.price = int(float(data['price']) * 100)
+    if 'description' in data:
+        price.description = data['description'].strip()
+    if 'sort_order' in data:
+        price.sort_order = data['sort_order']
+    if 'is_active' in data:
+        price.is_active = bool(data['is_active'])
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/prices/<int:pid>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_price(pid):
+    price = db.session.get(ServicePrice, pid)
+    if price:
+        db.session.delete(price)
+        db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ===================== ADMIN: INVOICE MANAGEMENT =====================
+@app.route('/admin/invoices')
+@login_required
+@admin_required
+def admin_invoices():
+    return render_template('admin/invoices.html')
+
+
+@app.route('/admin/api/invoices', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_invoices():
+    status = request.args.get('status', '')
+    q = Invoice.query
+    if status:
+        q = q.filter_by(status=status)
+    q = q.order_by(Invoice.created_at.desc()).all()
+    users = {u.id: u for u in User.query.all()}
+    return jsonify([{
+        'id': inv.id,
+        'user_id': inv.user_id,
+        'username': users[inv.user_id].username if inv.user_id in users else '未知',
+        'title': inv.title,
+        'tax_id': inv.tax_id or '',
+        'amount': inv.amount,
+        'order_ids': inv.order_ids or '',
+        'status': inv.status,
+        'file_url': inv.file_url or '',
+        'created_at': inv.created_at.strftime('%Y-%m-%d %H:%M'),
+    } for inv in q])
+
+
+@app.route('/admin/api/invoices/<int:iid>', methods=['PUT'])
+@login_required
+@admin_required
+def admin_update_invoice(iid):
+    inv = db.session.get(Invoice, iid)
+    if not inv:
+        return jsonify({'error': '未找到'}), 404
+    data = request.get_json() or {}
+    if 'status' in data:
+        inv.status = data['status']
+    if 'file_url' in data:
+        inv.file_url = data['file_url']
+    db.session.commit()
     return jsonify({'ok': True})
 
 

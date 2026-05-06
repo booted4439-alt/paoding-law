@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}发票管理 — 庖丁法律服务{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+{% block content %}
+<div class="admin-layout">
+    <nav class="admin-sidebar" id="admin-sidebar">
+        <h3>管理后台</h3>
+        <a href="/admin" class="admin-nav-link">概览</a>
+        <a href="/admin/consultations" class="admin-nav-link">咨询管理</a>
+        <a href="/admin/documents" class="admin-nav-link">文档管理</a>
+        <a href="/admin/users" class="admin-nav-link">用户管理</a>
+        <a href="/admin/recharges" class="admin-nav-link">充值管理</a>
+        <a href="/admin/prices" class="admin-nav-link">价格管理</a>
+        <a href="/admin/invoices" class="admin-nav-link active">发票管理</a>
+        <a href="/admin/settings" class="admin-nav-link">网站设置</a>
+    </nav>
+    <div class="admin-main">
+        <div class="admin-header">
+            <div class="admin-header-left"><h2>发票管理</h2></div>
+            <div class="admin-header-right"><a href="/" class="top-home-link">庖丁首页</a><button class="sidebar-toggle admin-sidebar-toggle" onclick="toggleAdminSidebar()">☰</button></div>
+        </div>
+
+        <div class="admin-filters">
+            <button class="filter-btn active" onclick="loadInvoices('', this)">全部</button>
+            <button class="filter-btn" onclick="loadInvoices('pending', this)">待开票</button>
+            <button class="filter-btn" onclick="loadInvoices('issued', this)">已开票</button>
+            <button class="filter-btn" onclick="loadInvoices('cancelled', this)">已取消</button>
+        </div>
+
+        <div id="invoices-table" class="admin-table"></div>
+    </div>
+</div>
+
+<!-- 开票 Modal -->
+<div class="modal" id="invoice-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>处理发票</h3>
+            <button class="modal-close" onclick="closeInvoiceModal()">&times;</button>
+        </div>
+        <form id="invoice-form">
+            <input type="hidden" name="id" id="inv-id">
+            <div class="form-group">
+                <label>状态</label>
+                <select name="status" id="inv-status">
+                    <option value="pending">待开票</option>
+                    <option value="issued">已开票</option>
+                    <option value="cancelled">已取消</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>发票文件 URL</label>
+                <input type="text" name="file_url" id="inv-file-url" placeholder="上传发票文件后填写URL">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline" onclick="closeInvoiceModal()">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function loadInvoices(status, el) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    if (el) el.classList.add('active');
+    const url = status ? `/admin/api/invoices?status=${status}` : '/admin/api/invoices';
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('invoices-table');
+            if (data.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 48px; color: var(--text-muted);">暂无发票申请</div>';
+                return;
+            }
+            const statusMap = {pending: '待开票', issued: '已开票', cancelled: '已取消'};
+            const statusColor = {pending: '#856404', issued: 'var(--success)', cancelled: '#383d41'};
+            const statusBg = {pending: '#fff3cd', issued: '#e6f4ea', cancelled: '#e2e3e5'};
+            let html = '<table><thead><tr><th>用户</th><th>抬头</th><th>税号</th><th>金额</th><th>状态</th><th>申请时间</th><th>操作</th></tr></thead><tbody>';
+            data.forEach(inv => {
+                html += `<tr>
+                    <td>${inv.username}</td>
+                    <td>${inv.title}</td>
+                    <td style="font-size: 0.82rem;">${inv.tax_id || '-'}</td>
+                    <td style="font-weight: 500;">${(inv.amount / 100).toFixed(2)} 元</td>
+                    <td><span style="background: ${statusBg[inv.status]}; color: ${statusColor[inv.status]}; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">${statusMap[inv.status] || inv.status}</span></td>
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">${inv.created_at}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="editInvoice(${inv.id})">处理</button>
+                        ${inv.file_url ? `<a href="${inv.file_url}" target="_blank" class="btn btn-sm btn-outline">文件</a>` : ''}
+                    </td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        });
+}
+
+function editInvoice(id) {
+    fetch('/admin/api/invoices')
+        .then(r => r.json())
+        .then(data => {
+            const inv = data.find(x => x.id === id);
+            if (!inv) return;
+            document.getElementById('inv-id').value = inv.id;
+            document.getElementById('inv-status').value = inv.status;
+            document.getElementById('inv-file-url').value = inv.file_url || '';
+            document.getElementById('invoice-modal').style.display = 'flex';
+        });
+}
+
+function closeInvoiceModal() {
+    document.getElementById('invoice-modal').style.display = 'none';
+}
+
+document.getElementById('invoice-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const id = document.getElementById('inv-id').value;
+    const data = {
+        status: document.getElementById('inv-status').value,
+        file_url: document.getElementById('inv-file-url').value,
+    };
+    fetch(`/admin/api/invoices/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                closeInvoiceModal();
+                loadInvoices('', document.querySelector('.admin-filters .filter-btn:first-child'));
+            }
+        });
+});
+
+loadInvoices('pending', document.querySelector('.admin-filters .filter-btn:nth-child(2)'));
+</script>
+{% endblock %}
