@@ -288,9 +288,15 @@ def auth_register():
         if phone and User.query.filter_by(phone=phone).first():
             flash('该手机号已注册', 'error')
         else:
-            user = User(username=username, email=email, phone=phone)
+            user = User(username=username, email=email, phone=phone, balance=30000)
             user.set_password(password)
             db.session.add(user)
+            db.session.commit()
+            # 赠送300元
+            tx = Transaction(user_id=user.id, type='recharge', amount=30000,
+                             balance_before=0, balance_after=30000,
+                             description='赠送')
+            db.session.add(tx)
             db.session.commit()
             login_user(user)
             return redirect(url_for('index'))
