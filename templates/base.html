@@ -20,11 +20,16 @@
             </a>
             <div class="nav-links">
                 <a href="/consult" class="nav-link">开始咨询</a>
-                <a href="/pricing" class="nav-link">服务价格</a>
+                <div class="nav-dropdown">
+                    <a href="javascript:;" class="nav-link nav-dropdown-toggle">付费 ⬇</a>
+                    <div class="nav-dropdown-menu">
+                        <a href="/pricing" class="nav-dropdown-item">服务价格</a>
+                        <a href="/balance" class="nav-dropdown-item">我的余额</a>
+                    </div>
+                </div>
                 <a href="/documents" class="nav-link">法律文档</a>
                 <a href="/contact" class="nav-link">联系我们</a>
                 {% if current_user.is_authenticated %}
-                    <a href="/balance" class="nav-link">我的余额</a>
                     {% if current_user.is_admin %}
                         <a href="/admin" class="nav-link admin-link">管理后台</a>
                     {% endif %}
