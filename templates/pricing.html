@@ -7,7 +7,8 @@
 {% block content %}
 <div style="max-width: 1100px; margin: 0 auto; padding: 32px 16px;">
     <h1 style="font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 4px;">服务价格</h1>
-    <p style="text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 32px;">AI辅助+律师审核确认回复为一次</p>
+    <p style="text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 4px;">AI辅助+律师审核确认回复为一次</p>
+    <p style="text-align: center; color: #aaa; font-size: 0.8rem; margin-bottom: 32px;">1次 = 100元</p>
 
     {% if not categories %}
     <p style="text-align: center; color: #999;">暂无定价信息</p>
@@ -32,7 +33,7 @@
                     <br><span style="font-size: 0.78rem; color: #999;">{{ p.description }}</span>
                     {% endif %}
                 </td>
-                <td style="padding: 10px 14px; text-align: right; font-weight: 600; color: #e44; white-space: nowrap; width: 60px;">{{ '%.0f'|format(p.price/100) }}元</td>
+                <td style="padding: 10px 14px; text-align: right; font-weight: 600; color: #e44; white-space: nowrap; width: 50px;">{{ '%.0f'|format(p.price/10000) }}次</td>
             </tr>
             {% endfor %}
             </tbody>
