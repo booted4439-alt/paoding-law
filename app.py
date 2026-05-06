@@ -356,14 +356,18 @@ def index():
 
 @app.route('/privacy')
 def privacy():
+    import markdown
     content = get_setting('privacy_content')
-    return render_template('static_page.html', title='隐私政策', content=content)
+    html = markdown.markdown(content, extensions=['markdown.extensions.fenced_code'])
+    return render_template('static_page.html', title='隐私政策', content=html)
 
 
 @app.route('/terms')
 def terms():
+    import markdown
     content = get_setting('terms_content')
-    return render_template('static_page.html', title='用户协议', content=content)
+    html = markdown.markdown(content, extensions=['markdown.extensions.fenced_code'])
+    return render_template('static_page.html', title='用户协议', content=html)
 
 
 @app.route('/contact')
