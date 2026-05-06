@@ -5,61 +5,47 @@
 {% block main_class %}{% endblock %}
 {% block footer_class %}{% endblock %}
 {% block content %}
-<div class="pricing-page" style="max-width: 1000px; margin: 0 auto; padding: 40px 24px;">
-    <div style="text-align: center; margin-bottom: 48px;">
-        <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 12px;">服务价格</h1>
-        <p style="color: var(--text-secondary); font-size: 1rem;">透明定价，按次付费，先用后付</p>
-    </div>
+<div style="max-width: 800px; margin: 0 auto; padding: 32px 16px;">
+    <h1 style="font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 4px;">服务价格</h1>
+    <p style="text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 32px;">AI辅助+律师审核确认回复为一次</p>
 
     {% if not categories %}
-    <div style="text-align: center; padding: 60px 24px; color: var(--text-muted);">
-        <p>暂无定价信息</p>
-    </div>
+    <p style="text-align: center; color: #999;">暂无定价信息</p>
     {% endif %}
 
     {% for cat, items in categories.items() %}
-    <div class="pricing-category" style="margin-bottom: 40px;">
-        <h2 style="font-size: 1.2rem; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border-light);">
-            {% if cat == 'consult' %}📋 法律咨询
-            {% elif cat == 'contract' %}📄 合同服务
-            {% elif cat == 'document' %}📑 文书代写
-            {% elif cat == 'other' %}🔧 其他服务
-            {% else %}{{ cat }}{% endif %}
-        </h2>
-        <div style="display: grid; gap: 12px;">
+    <h2 style="font-size: 1.1rem; font-weight: 600; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e5e5;">
+        {% if cat == 'consult' %}📋 法律咨询
+        {% elif cat == 'contract' %}📄 合同服务
+        {% elif cat == 'document' %}📑 文书代写
+        {% elif cat == 'other' %}🔧 其他服务
+        {% else %}{{ cat }}{% endif %}
+    </h2>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+        <thead>
+            <tr style="border-bottom: 1px solid #ddd;">
+                <th style="text-align: left; padding: 8px 12px; font-weight: 500; color: #666;">服务项目</th>
+                <th style="text-align: right; padding: 8px 12px; font-weight: 500; color: #666; width: 100px;">价格</th>
+            </tr>
+        </thead>
+        <tbody>
             {% for p in items %}
-            <div class="pricing-card" style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border: 1px solid var(--border-light); border-radius: var(--radius); transition: all 0.2s;">
-                <div style="flex: 1;">
-                    <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">{{ p.name }}</h3>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px 12px;">
+                    {{ p.name }}
                     {% if p.description %}
-                    <p style="font-size: 0.85rem; color: var(--text-secondary);">{{ p.description }}</p>
+                    <br><span style="font-size: 0.8rem; color: #999;">{{ p.description }}</span>
                     {% endif %}
-                </div>
-                <div style="text-align: right; flex-shrink: 0; margin-left: 20px;">
-                    <span style="font-size: 1.4rem; font-weight: 700; color: var(--primary);">{{ '%.2f'|format(p.price/100) }}</span>
-                    <span style="font-size: 0.85rem; color: var(--text-muted);"> 元</span>
-                </div>
-            </div>
+                </td>
+                <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #e44;">{{ '%.0f'|format(p.price/100) }} 元</td>
+            </tr>
             {% endfor %}
-        </div>
-    </div>
+        </tbody>
+    </table>
     {% endfor %}
 
-    <div style="text-align: center; margin-top: 48px; padding: 32px; background: var(--bg-secondary); border-radius: var(--radius);">
-        <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 8px;">需要更多帮助？</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">联系我们获取定制化法律解决方案</p>
-        <a href="/contact" class="btn btn-primary">联系我们</a>
-    </div>
+    <p style="text-align: center; margin-top: 32px; font-size: 0.85rem; color: #999;">
+        如需委托律师代理/辩护/谈判/律师函等，单独和律师沟通确认报价
+    </p>
 </div>
-
-<style>
-.pricing-card:hover {
-    border-color: var(--primary);
-    box-shadow: var(--shadow);
-}
-@media (max-width: 600px) {
-    .pricing-card { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .pricing-card > div:last-child { margin-left: 0; text-align: left; }
-}
-</style>
 {% endblock %}
