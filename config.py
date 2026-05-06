@@ -28,3 +28,7 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp',
                           'pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'}
     ITEMS_PER_PAGE = 20
+
+    # 支付宝配置
+    ALIPAY_NOTIFY_URL = os.environ.get('ALIPAY_NOTIFY_URL', 'https://paodinglaw.com/api/alipay/notify')
+    ALIPAY_RETURN_URL = os.environ.get('ALIPAY_RETURN_URL', 'https://paodinglaw.com/balance/top_up/alipay/return')

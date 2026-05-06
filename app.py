@@ -424,13 +424,37 @@ def balance_top_up():
             amount = int(float(amount_str) * 100)
         except ValueError:
             flash('请输入正确的金额', 'error')
-            return render_template('top_up.html')
+            return render_template('top_up.html', env={'alipay_configured': bool(os.environ.get('ALIPAY_APP_ID', ''))})
         if amount < 1:
             flash('请输入正确的金额', 'error')
-            return render_template('top_up.html')
+            return render_template('top_up.html', env={'alipay_configured': bool(os.environ.get('ALIPAY_APP_ID', ''))})
 
         import uuid
         order_no = 'CZ' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+
+        # 支付宝支付：直接跳转支付页面
+        if payment_method == 'alipay':
+            from services.alipay import create_trade
+            amount_yuan = amount / 100
+            success, result = create_trade(
+                order_no=order_no,
+                subject='庖丁法律服务-充值',
+                total_amount=amount_yuan,
+                notify_url=app.config['ALIPAY_NOTIFY_URL'],
+                return_url=app.config['ALIPAY_RETURN_URL']
+            )
+            if success:
+                # 先创建订单
+                order = RechargeOrder(user_id=current_user.id, order_no=order_no,
+                                      amount=amount, payment_method='alipay',
+                                      status='pending', remark=remark)
+                db.session.add(order)
+                db.session.commit()
+                return redirect(result)
+            else:
+                flash(result, 'error')
+                return render_template('top_up.html', env={'alipay_configured': bool(os.environ.get('ALIPAY_APP_ID', ''))})
+
         order = RechargeOrder(user_id=current_user.id, order_no=order_no,
                               amount=amount, payment_method=payment_method,
                               status='pending', remark=remark)
@@ -449,7 +473,73 @@ def balance_top_up():
         flash('充值申请已提交，请等待管理员审核', 'success')
         return redirect(url_for('balance_orders'))
 
-    return render_template('top_up.html')
+    return render_template('top_up.html', env={
+        'alipay_configured': bool(os.environ.get('ALIPAY_APP_ID', ''))
+    })
+
+
+# ===================== 支付宝支付回调 =====================
+
+@app.route('/api/alipay/notify', methods=['POST'])
+def alipay_notify():
+    """支付宝异步通知回调"""
+    from services.alipay import verify_notification
+    data = request.form.to_dict()
+    success, verified_data = verify_notification(data)
+    if not success:
+        return 'failure'
+
+    trade_status = verified_data.get('trade_status')
+    if trade_status != 'TRADE_SUCCESS':
+        return 'failure'
+
+    order_no = verified_data.get('out_trade_no', '')
+    trade_no = verified_data.get('trade_no', '')
+    total_amount = float(verified_data.get('total_amount', 0))
+
+    if not order_no or not order_no.startswith('CZ'):
+        return 'failure'
+
+    order = RechargeOrder.query.filter_by(order_no=order_no).first()
+    if not order or order.status != 'pending':
+        return 'success'  # 已处理
+
+    amount = int(total_amount * 100)
+    if order.amount != amount:
+        return 'failure'
+
+    # 更新订单
+    order.status = 'success'
+    order.trade_no = trade_no
+    order.admin_id = 0
+
+    # 增加余额
+    user = User.query.get(order.user_id)
+    if user:
+        old_balance = user.balance or 0
+        user.balance = old_balance + amount
+
+    # 记录交易
+    tx = Transaction(
+        user_id=order.user_id, type='recharge',
+        amount=amount, balance_before=old_balance,
+        balance_after=user.balance if user else 0,
+        order_id=order.id, description=f'支付宝充值 {total_amount} 元'
+    )
+    db.session.add(tx)
+    db.session.commit()
+    return 'success'
+
+
+@app.route('/balance/top_up/alipay/return')
+@login_required
+def alipay_return():
+    """支付宝支付成功返回页"""
+    out_trade_no = request.args.get('out_trade_no', '')
+    trade_no = request.args.get('trade_no', '')
+    total_amount = request.args.get('total_amount', '')
+    flash('充值成功！', 'success')
+    return redirect(url_for('balance_orders'))
 
 
 @app.route('/api/balance')
