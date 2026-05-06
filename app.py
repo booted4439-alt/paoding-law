@@ -1222,6 +1222,7 @@ def admin_list_recharges():
         'order_no': o.order_no,
         'user_id': o.user_id,
         'username': users[o.user_id].username if o.user_id in users else '未知',
+        'phone': users[o.user_id].phone if o.user_id in users else '',
         'amount': o.amount,
         'payment_method': o.payment_method,
         'status': o.status,
@@ -1274,12 +1275,20 @@ def admin_reject_recharge(oid):
 @admin_required
 def admin_adjust_balance():
     data = request.get_json() or {}
+    phone = data.get('phone')
     user_id = data.get('user_id')
     amount = data.get('amount', 0)  # 单位：分，可正可负
     reason = data.get('reason', '').strip()
-    if not user_id or not amount:
-        return jsonify({'error': '参数不完整'}), 400
-    user = db.session.get(User, int(user_id))
+    if phone:
+        user = User.query.filter_by(phone=phone).first()
+        if not user:
+            return jsonify({'error': '未找到该手机号的用户'}), 404
+    elif user_id:
+        user = db.session.get(User, int(user_id))
+    else:
+        return jsonify({'error': '请输入用户手机号'}), 400
+    if not user:
+        return jsonify({'error': '用户未找到'}), 404
     if not user:
         return jsonify({'error': '用户未找到'}), 404
     before = user.balance

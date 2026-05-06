@@ -5,7 +5,7 @@
 {% block main_class %}{% endblock %}
 {% block footer_class %}{% endblock %}
 {% block content %}
-<div style="max-width: 600px; margin: 0 auto; padding: 40px 16px;">
+<div style="max-width: 500px; margin: 0 auto; padding: 40px 16px;">
     <a href="/balance" class="btn btn-outline btn-sm" style="margin-bottom: 24px;">← 返回余额</a>
     <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 24px;">充值</h1>
 
@@ -21,47 +21,43 @@
             <div class="form-group">
                 <label>支付方式</label>
                 <select name="payment_method" id="payment-method" onchange="togglePayment()">
+                    <option value="wechat">微信转账</option>
                     {% if env and env.get('alipay_configured') %}
                     <option value="alipay">支付宝</option>
                     {% endif %}
-                    <option value="manual" {% if not env or not env.get('alipay_configured') %}selected{% endif %}>银行转账</option>
                 </select>
             </div>
 
-            <!-- 支付宝支付（在线自动到账） -->
+            <!-- 微信转账 -->
+            <div id="wechat-section" style="text-align: center; padding: 20px 0; margin-bottom: 16px;">
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">请使用微信扫描下方二维码付款</p>
+                <img src="/static/wechat_qrcode.jpg" alt="微信收款码" style="width: 220px; height: 220px; border: 1px solid #eee; border-radius: 8px;">
+                <p style="font-size: 0.8rem; color: #999; margin-top: 12px;">付款后请截图上传凭证，管理员审核后到账</p>
+            </div>
+
+            <!-- 支付宝（在线自动到账） -->
             <div id="alipay-section" style="display:none; background: #f8f9fa; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
                 <p style="font-size: 0.85rem; color: #666;">
                     ✅ 支付宝在线支付，支付成功自动到账，无需等待审核
                 </p>
             </div>
 
-            <!-- 银行转账（手动审核） -->
-            <div id="manual-section">
-                <div style="background: #f8f9fa; border-radius: 6px; padding: 16px; margin-bottom: 16px;">
-                    <div style="font-size: 0.85rem; color: #666; line-height: 2;">
-                        <p><strong>开户行：</strong>中国银行上海陆家嘴支行</p>
-                        <p><strong>户名：</strong>庖丁法律服务（上海）有限公司</p>
-                        <p><strong>账号：</strong>****</p>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label>付款凭证（截图）</label>
+                <input type="file" name="voucher" accept="image/*" id="voucher-input">
+                <div style="font-size: 0.78rem; color: #999; margin-top: 4px;">微信付款后请上传付款截图</div>
+            </div>
 
-                <div class="form-group">
-                    <label>转账凭证（截图）</label>
-                    <input type="file" name="voucher" accept="image/*" id="voucher-input">
-                    <div style="font-size: 0.78rem; color: #999; margin-top: 4px;">请上传转账截图或付款凭证</div>
-                </div>
-
-                <div class="form-group">
-                    <label>备注（选填）</label>
-                    <input type="text" name="remark" placeholder="如有需要，请备注说明">
-                </div>
+            <div class="form-group">
+                <label>备注（选填）</label>
+                <input type="text" name="remark" placeholder="请填写您的手机号，便于核对">
             </div>
 
             <button type="submit" class="btn btn-primary btn-lg btn-block" id="submit-btn">
-                {% if env and env.get('alipay_configured') %}去支付{% else %}提交充值申请{% endif %}
+                提交充值申请
             </button>
 
-            <div id="manual-hint" style="margin-top: 12px; font-size: 0.8rem; color: #999; text-align: center;">
+            <div style="margin-top: 12px; font-size: 0.8rem; color: #999; text-align: center;">
                 提交后请等待管理员审核，审核通过后余额将自动到账
             </div>
         </form>
@@ -71,12 +67,10 @@
 <script>
 function togglePayment() {
     const method = document.getElementById('payment-method').value;
+    document.getElementById('wechat-section').style.display = method === 'wechat' ? 'block' : 'none';
     document.getElementById('alipay-section').style.display = method === 'alipay' ? 'block' : 'none';
-    document.getElementById('manual-section').style.display = method === 'manual' ? 'block' : 'none';
-    document.getElementById('manual-hint').style.display = method === 'manual' ? 'block' : 'none';
-    document.getElementById('submit-btn').textContent = method === 'alipay' ? '去支付' : '提交充值申请';
-    // 支付宝不需要上传凭证
     document.getElementById('voucher-input').required = method !== 'alipay';
+    document.getElementById('submit-btn').textContent = method === 'alipay' ? '去支付' : '提交充值申请';
 }
 togglePayment();
 </script>
