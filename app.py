@@ -921,6 +921,7 @@ def send_message(c_id):
     if current_user.is_admin or current_user.is_lawyer:
         # 递增律师回复计数
         c.lawyer_reply_count = (c.lawyer_reply_count or 0) + 1
+        db.session.commit()
 
         # 通知咨询发起用户（有邮箱的）
         owner = db.session.get(User, c.user_id)
