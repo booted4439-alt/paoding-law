@@ -67,8 +67,6 @@
                 <div class="chat-header-actions">
                     <a href="/" class="btn btn-sm btn-outline home-nav-btn">首页</a>
                     <button class="sidebar-toggle" id="active-sidebar-toggle" onclick="toggleSidebar()" title="咨询记录">☰</button>
-                    <button class="btn btn-sm btn-outline" onclick="closeCurrentChat()">关闭</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteCurrentChat()">删除</button>
                 </div>
             </div>
             <div class="chat-messages" id="chat-messages"></div>
@@ -456,29 +454,7 @@ function closeChat() {
 }
 
 function closeCurrentChat() {
-    if (!currentConsultationId || !confirm('确定关闭此咨询？关闭后如需继续请重新发起咨询。')) return;
-    fetch('/api/consultations/' + currentConsultationId + '/close', { method: 'POST' })
-        .then(r => r.json()).then(data => {
-            if (data.ok) {
-                closeChat();
-                loadConsultations();
-            } else if (data.error) {
-                alert(data.error);
-            }
-        });
-}
-
-function deleteCurrentChat() {
-    if (!currentConsultationId || !confirm('确定删除此咨询？')) return;
-    fetch('/api/consultations/' + currentConsultationId, { method: 'DELETE' })
-        .then(r => r.json()).then(data => {
-            if (data.ok) {
-                closeChat();
-                loadConsultations();
-            } else if (data.error) {
-                alert(data.error);
-            }
-        });
+    closeChat();
 }
 
 // ========== Utilities ==========
