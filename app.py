@@ -820,6 +820,9 @@ def get_consultation(c_id):
         'status': c.status,
         'lawyer': c.lawyer.username if c.lawyer else None,
         'message_count': c.messages.count(),
+        'lawyer_reply_count': c.lawyer_reply_count or 0,
+        'excluded_count': c.excluded_count or 0,
+        'actual_fee': c.actual_fee or 0,
         'created_at': c.created_at.strftime('%Y-%m-%d %H:%M'),
         'updated_at': c.updated_at.strftime('%Y-%m-%d %H:%M'),
     })
