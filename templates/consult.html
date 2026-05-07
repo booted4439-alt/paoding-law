@@ -63,6 +63,7 @@
                     <h3 id="chat-title"></h3>
                     <span class="chat-status" id="chat-status"></span>
                 </div>
+                <div id="chat-fee-info" style="display:none;background:#e8f5e9;padding:8px 12px;border-radius:6px;border-left:3px solid #4caf50;font-size:0.8rem;margin:4px 12px 0;color:#555;"></div>
                 <div class="chat-header-actions">
                     <a href="/" class="btn btn-sm btn-outline home-nav-btn">首页</a>
                     <button class="sidebar-toggle" id="active-sidebar-toggle" onclick="toggleSidebar()" title="咨询记录">☰</button>
@@ -208,6 +209,18 @@ function openChat(id) {
             if (c) {
                 document.getElementById('chat-title').textContent = escHtml(c.title);
                 document.getElementById('chat-status').textContent = statusLabel(c.status);
+                // 显示费用信息
+                var feeInfo = document.getElementById('chat-fee-info');
+                if (c.status === 'completed' && c.actual_fee) {
+                    var excluded = c.excluded_count || 0;
+                    var replied = c.lawyer_reply_count || 0;
+                    if (feeInfo) {
+                        feeInfo.style.display = 'block';
+                        feeInfo.innerHTML = '已扣费 <strong>' + (c.actual_fee/100).toFixed(0) + '</strong> 元，律师回复 ' + replied + ' 次，剔除 ' + excluded + ' 次，最终按照 ' + (replied - excluded) + ' 次扣费';
+                    }
+                } else if (feeInfo) {
+                    feeInfo.style.display = 'none';
+                }
             }
         });
 
@@ -470,7 +483,7 @@ function deleteCurrentChat() {
 
 // ========== Utilities ==========
 function statusLabel(s) {
-    return {'pending':'待处理','active':'进行中','closed':'已关闭'}[s] || s;
+    return {'pending':'待处理','active':'进行中','completed':'已完成','closed':'已关闭'}[s] || s;
 }
 
 function escHtml(s) {
