@@ -41,7 +41,11 @@ class Consultation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    status = db.Column(db.String(20), default='pending')  # pending, active, closed
+    status = db.Column(db.String(20), default='pending')  # pending, active, closed, completed
+    lawyer_reply_count = db.Column(db.Integer, default=0)
+    excluded_count = db.Column(db.Integer, default=0)
+    estimated_fee = db.Column(db.Integer, default=0)
+    actual_fee = db.Column(db.Integer, default=0)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     lawyer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=_now)

@@ -679,6 +679,8 @@ def create_consultation():
         return jsonify({'error': '请输入咨询标题'}), 400
     if not current_user.phone and not current_user.is_admin:
         return jsonify({'error': '请先绑定手机号'}), 403
+    if not current_user.is_admin and not current_user.is_lawyer and current_user.balance < 10000:
+        return jsonify({'error': '余额不足，咨询需账户余额不低于100元，请先充值'}), 403
     c = Consultation(title=title, description=description, user_id=current_user.id)
     db.session.add(c)
     db.session.flush()
@@ -716,6 +718,8 @@ def create_consultation_with_message():
         return jsonify({'error': '请输入您的问题'}), 400
     if not current_user.phone and not current_user.is_admin:
         return jsonify({'error': '请先绑定手机号'}), 403
+    if not current_user.is_admin and not current_user.is_lawyer and current_user.balance < 10000:
+        return jsonify({'error': '余额不足，咨询需账户余额不低于100元，请先充值'}), 403
 
     # Validate limits
     files = request.files.getlist('file')
@@ -913,55 +917,10 @@ def send_message(c_id):
             except Exception as e:
                 print(f'[EMAIL] 通知失败: {e}')
 
-    # 律师/管理员回复 → 扣费检查 + 通知咨询发起用户
+    # 律师/管理员回复 → 计数 + 通知咨询发起用户
     if current_user.is_admin or current_user.is_lawyer:
-        # 检查用户余额并扣费（每次律师回复扣一次费）
-        if c.status != 'pending':
-            try:
-                # 查找该咨询对应的有效服务价格
-                price = ServicePrice.query.filter_by(
-                    category='consult', is_active=True
-                ).order_by(ServicePrice.sort_order).first()
-                if price and price.price > 0:
-                    owner = db.session.get(User, c.user_id)
-                    if owner and not owner.is_admin and not owner.is_lawyer:
-                        # 查找此咨询的ServiceOrder
-                        so = ServiceOrder.query.filter_by(
-                            consultation_id=c.id, user_id=c.user_id
-                        ).first()
-                        if not so:
-                            so = ServiceOrder(
-                                user_id=c.user_id,
-                                service_type='consult',
-                                price_id=price.id,
-                                amount=0,
-                                status='pending',
-                                consultation_id=c.id,
-                                description=f'咨询回复计费：{c.title}'
-                            )
-                            db.session.add(so)
-                            db.session.flush()
-
-                        # 每次律师回复扣费
-                        fee = price.price
-                        if owner.balance >= fee:
-                            before = owner.balance
-                            owner.balance -= fee
-                            so.amount += fee
-                            so.lawyer_reply_count += 1
-                            so.status = 'paid' if so.lawyer_reply_count > 0 else so.status
-                            tx = Transaction(
-                                user_id=owner.id,
-                                type='consume',
-                                amount=-fee,
-                                balance_before=before,
-                                balance_after=owner.balance,
-                                service_type='consult',
-                                description=f'律师回复扣费 {fee/100:.2f} 元'
-                            )
-                            db.session.add(tx)
-            except Exception as e:
-                app.logger.error(f'扣费失败: {e}')
+        # 递增律师回复计数
+        c.lawyer_reply_count = (c.lawyer_reply_count or 0) + 1
 
         # 通知咨询发起用户（有邮箱的）
         owner = db.session.get(User, c.user_id)
@@ -1090,6 +1049,10 @@ def admin_list_consultations():
             'client': c.client.username if c.client else '未知',
             'lawyer': c.lawyer.username if c.lawyer else None,
             'message_count': c.messages.count(),
+            'lawyer_reply_count': c.lawyer_reply_count or 0,
+            'excluded_count': c.excluded_count or 0,
+            'estimated_fee': c.estimated_fee or 0,
+            'actual_fee': c.actual_fee or 0,
             'created_at': c.created_at.strftime('%Y-%m-%d %H:%M'),
         } for c in pagination.items],
         'total': pagination.total,
@@ -1120,6 +1083,79 @@ def admin_assign_lawyer(c_id):
     c.lawyer_id = lawyer_id
     db.session.commit()
     return jsonify({'ok': True})
+
+
+@app.route('/admin/api/consultations/<int:c_id>/excluded', methods=['POST'])
+@login_required
+@admin_required
+def admin_update_excluded_count(c_id):
+    """Update excluded count for a consultation."""
+    c = db.session.get(Consultation, c_id)
+    if not c:
+        return jsonify({'error': '未找到咨询'}), 404
+    if c.status == 'completed':
+        return jsonify({'error': '已完成咨询不能修改剔除次数'}), 400
+    data = request.get_json() or {}
+    val = data.get('excluded_count', 0)
+    try:
+        val = int(val)
+    except (ValueError, TypeError):
+        return jsonify({'error': '无效的数字'}), 400
+    if val < 0:
+        return jsonify({'error': '剔除次数不能为负数'}), 400
+    if val > (c.lawyer_reply_count or 0):
+        return jsonify({'error': '剔除次数不能超过律师回复次数'}), 400
+    c.excluded_count = val
+    db.session.commit()
+    return jsonify({'ok': True, 'excluded_count': val})
+
+
+@app.route('/admin/api/consultations/<int:c_id>/complete', methods=['POST'])
+@login_required
+@admin_required
+def admin_complete_consultation(c_id):
+    """Complete a consultation: calculate fee, deduct from user balance, record transaction."""
+    c = db.session.get(Consultation, c_id)
+    if not c:
+        return jsonify({'error': '未找到咨询'}), 404
+    if c.status == 'completed':
+        return jsonify({'error': '咨询已完成'}), 400
+    if c.status == 'closed':
+        return jsonify({'error': '咨询已关闭'}), 400
+
+    reply_count = c.lawyer_reply_count or 0
+    excluded = c.excluded_count or 0
+    payable = reply_count - excluded
+    unit_price = 10000  # 100元/次，单位为分
+    fee = payable * unit_price
+
+    owner = db.session.get(User, c.user_id)
+    if not owner:
+        return jsonify({'error': '用户不存在'}), 404
+
+    if fee > 0:
+        if owner.balance < fee:
+            return jsonify({'error': f'用户余额不足，需要 {fee/100:.0f} 元，当前余额 {owner.balance/100:.0f} 元'}), 400
+
+        before = owner.balance
+        owner.balance -= fee
+        tx = Transaction(
+            user_id=owner.id,
+            type='consume',
+            amount=-fee,
+            balance_before=before,
+            balance_after=owner.balance,
+            service_type='consult',
+            description=f'咨询完成扣费 {fee/100:.0f} 元（{reply_count}次律师回复 - {excluded}次剔除 = {payable}次×100元）'
+        )
+        db.session.add(tx)
+
+    c.actual_fee = fee
+    c.status = 'completed'
+    c.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return jsonify({'ok': True, 'fee': fee, 'fee_yuan': f'{fee/100:.0f}'})
 
 
 @app.route('/admin/documents')

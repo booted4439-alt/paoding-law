@@ -22,8 +22,20 @@
         <h2>咨询 #{{ consultation.id }} - {{ consultation.title }}</h2>
         <div class="consult-info">
             <p><strong>用户：</strong>{{ consultation.client.username if consultation.client else '未知' }}</p>
-            <p><strong>状态：</strong><span class="status-badge status-{{ consultation.status }}">{{ {'pending':'待处理','active':'进行中','closed':'已关闭'}[consultation.status] }}</span></p>
+            <p><strong>状态：</strong><span class="status-badge status-{{ consultation.status }}">{{ {'pending':'待处理','active':'进行中','completed':'已完成','closed':'已关闭'}[consultation.status] }}</span></p>
             <p><strong>创建时间：</strong>{{ consultation.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            {% if consultation.status == 'completed' %}
+            <p class="fee-info"><strong>费用信息：</strong>已扣费 <span class="fee-amount">{{ '%.0f'|format((consultation.actual_fee or 0)/100) }}</span> 元，律师回复 {{ consultation.lawyer_reply_count or 0 }} 次，剔除 {{ consultation.excluded_count or 0 }} 次，最终按照 {{ (consultation.lawyer_reply_count or 0) - (consultation.excluded_count or 0) }} 次扣费</p>
+            {% endif %}
+            {% if consultation.status != 'completed' and consultation.status != 'closed' %}
+            {% if current_user.is_admin %}
+            <div class="consult-actions" style="margin-top: 12px;">
+                <label style="font-size: 0.85rem; margin-right: 8px;">剔除次数：</label>
+                <input type="number" id="excluded-count-input" value="{{ consultation.excluded_count or 0 }}" min="0" max="{{ consultation.lawyer_reply_count or 0 }}" style="width: 80px; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px;" onchange="adminUpdateExcludedCount({{ consultation.id }}, this.value)">
+                <button class="btn btn-primary" onclick="adminCompleteConsultation({{ consultation.id }})" style="margin-left: 16px;">✅ 完成咨询</button>
+            </div>
+            {% endif %}
+            {% endif %}
         </div>
 
         <div class="admin-chat" id="admin-chat">
@@ -164,4 +176,11 @@ function adminAutoResize(el) {
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 loadMessages();
 </script>
+<style>
+.fee-info { background: #e8f5e9; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #4caf50; margin-top: 8px; }
+.fee-amount { font-weight: 700; color: #e44; font-size: 1.1rem; }
+.consult-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.btn-primary { background: #1a73e8; color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+.btn-primary:hover { background: #1557b0; }
+</style>
 {% endblock %}
