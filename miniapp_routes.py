@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from functools import wraps
 
 from flask import Blueprint, request, jsonify, current_app
-from models import db, User, SiteSetting, Transaction
+from models import db, User, SiteSetting, Transaction, RechargeOrder
 
 # ---- 无状态 Token（多 worker 兼容） ----
 # 使用 HMAC 签名，不依赖内存存储
@@ -218,20 +218,10 @@ def wechat_bind_phone(current_user):
 
         # 模式1：短信验证码验证
         if sms_code:
-            verified = False
-            try:
-                verify_result = check_sms_code(phone, sms_code)
-                if verify_result.get('success') and verify_result.get('verify_result') == 'PASS':
-                    verified = True
-            except Exception as e:
-                current_app.logger.error(f'SMS验证异常: {e}')
-
-            # 开发模式：SMS 验证失败时降级为直接绑定
-            if not verified and not is_dev_mode():
+            verify_result = check_sms_code(phone, sms_code)
+            if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
                 return jsonify({'error': '验证码错误或已过期'}), 400
-
-        # 模式3（dev-only）：无验证码也允许绑定
-        elif not is_dev_mode():
+        else:
             return jsonify({'error': '请输入短信验证码'}), 400
 
         # 检查重复
@@ -253,9 +243,15 @@ def wechat_bind_phone(current_user):
         if current_user.balance is None or current_user.balance == 0:
             from models import Transaction
             current_user.balance = 30000
+            order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+            order = RechargeOrder(user_id=current_user.id, order_no=order_no, amount=30000,
+                                  payment_method='gift', status='success', admin_id=None,
+                                  remark='绑定手机赠送')
+            db.session.add(order)
+            db.session.flush()
             tx = Transaction(user_id=current_user.id, type='recharge', amount=30000,
                              balance_before=0, balance_after=30000,
-                             description='赠送')
+                             order_id=order.id, description='赠送')
             db.session.add(tx)
 
         db.session.commit()
@@ -299,9 +295,15 @@ def wechat_bind_phone(current_user):
         if current_user.balance is None or current_user.balance == 0:
             from models import Transaction
             current_user.balance = 30000
+            order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+            order = RechargeOrder(user_id=current_user.id, order_no=order_no, amount=30000,
+                                  payment_method='gift', status='success', admin_id=None,
+                                  remark='绑定手机赠送')
+            db.session.add(order)
+            db.session.flush()
             tx = Transaction(user_id=current_user.id, type='recharge', amount=30000,
                              balance_before=0, balance_after=30000,
-                             description='赠送')
+                             order_id=order.id, description='赠送')
             db.session.add(tx)
 
         db.session.commit()
@@ -448,9 +450,15 @@ def mini_register():
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
+    order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+    order = RechargeOrder(user_id=user.id, order_no=order_no, amount=30000,
+                          payment_method='gift', status='success', admin_id=None,
+                          remark='注册赠送')
+    db.session.add(order)
+    db.session.flush()
     tx = Transaction(user_id=user.id, type='recharge', amount=30000,
                      balance_before=0, balance_after=30000,
-                     description='赠送')
+                     order_id=order.id, description='赠送')
     db.session.add(tx)
     db.session.commit()
 

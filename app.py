@@ -37,6 +37,7 @@ app.config.from_object(Config)
 db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth_login'
+login_manager.login_message = ''
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Register mini-program API blueprint
@@ -139,14 +140,11 @@ def auth_login():
             if not sms_code:
                 flash('请输入验证码', 'error')
                 return render_template('login.html', login_mode='sms')
-            try:
-                from services.sms import check_sms_code
-                verify_result = check_sms_code(phone, sms_code)
-                if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
-                    flash('验证码错误或已过期', 'error')
-                    return render_template('login.html', login_mode='sms')
-            except Exception:
-                pass  # 开发模式降级
+            from services.sms import check_sms_code
+            verify_result = check_sms_code(phone, sms_code)
+            if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
+                flash('验证码错误或已过期', 'error')
+                return render_template('login.html', login_mode='sms')
             user = User.query.filter_by(phone=phone).first()
             if user:
                 login_user(user)
@@ -293,9 +291,15 @@ def auth_register():
             db.session.add(user)
             db.session.commit()
             # 赠送300元
+            order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+            order = RechargeOrder(user_id=user.id, order_no=order_no, amount=30000,
+                                  payment_method='gift', status='success', admin_id=None,
+                                  remark='注册赠送')
+            db.session.add(order)
+            db.session.flush()
             tx = Transaction(user_id=user.id, type='recharge', amount=30000,
                              balance_before=0, balance_after=30000,
-                             description='赠送')
+                             order_id=order.id, description='赠送')
             db.session.add(tx)
             db.session.commit()
             login_user(user)
@@ -512,52 +516,54 @@ def balance_top_up():
 @app.route('/api/alipay/notify', methods=['POST'])
 def alipay_notify():
     """支付宝异步通知回调"""
-    from services.alipay import verify_notification
-    data = request.form.to_dict()
-    success, verified_data = verify_notification(data)
-    if not success:
+    import traceback, logging as logger
+    logger.basicConfig(filename='/tmp/alipay_notify_error.log', level=logger.ERROR)
+    try:
+        from services.alipay import verify_notification
+        data = request.form.to_dict()
+        logger.info(f'notify data keys: {list(data.keys())}')
+        success, verified_data = verify_notification(data)
+        if not success:
+            logger.error(f'verify failed, data keys: {list(data.keys())}')
+            return 'failure'
+        trade_status = verified_data.get('trade_status')
+        if trade_status != 'TRADE_SUCCESS':
+            logger.error(f'bad trade_status: {trade_status}')
+            return 'failure'
+        order_no = verified_data.get('out_trade_no', '')
+        trade_no = verified_data.get('trade_no', '')
+        total_amount_str = verified_data.get('total_amount', '0')
+        total_amount = float(total_amount_str)
+        if not order_no or not order_no.startswith('CZ'):
+            logger.error(f'bad order_no: {order_no}')
+            return 'failure'
+        order = RechargeOrder.query.filter_by(order_no=order_no).first()
+        if not order or order.status != 'pending':
+            return 'success'
+        amount = int(round(total_amount * 100))
+        if order.amount != amount:
+            logger.error(f'amount mismatch: order={order.amount}, calc={amount}, total={total_amount_str}')
+            return 'failure'
+        order.status = 'success'
+        order.trade_no = trade_no
+        order.admin_id = None
+        user = User.query.get(order.user_id)
+        if user:
+            old_balance = user.balance or 0
+            user.balance = old_balance + amount
+        tx = Transaction(
+            user_id=order.user_id, type='recharge',
+            amount=amount, balance_before=old_balance,
+            balance_after=user.balance if user else 0,
+            order_id=order.id, description=f'支付宝充值 {total_amount} 元'
+        )
+        db.session.add(tx)
+        db.session.commit()
+        logger.info(f'recharge auto-approved: order={order_no}, amount={amount}')
+        return 'success'
+    except Exception as e:
+        logger.error(f'alipay_notify exception: {e}\n{traceback.format_exc()}')
         return 'failure'
-
-    trade_status = verified_data.get('trade_status')
-    if trade_status != 'TRADE_SUCCESS':
-        return 'failure'
-
-    order_no = verified_data.get('out_trade_no', '')
-    trade_no = verified_data.get('trade_no', '')
-    total_amount = float(verified_data.get('total_amount', 0))
-
-    if not order_no or not order_no.startswith('CZ'):
-        return 'failure'
-
-    order = RechargeOrder.query.filter_by(order_no=order_no).first()
-    if not order or order.status != 'pending':
-        return 'success'  # 已处理
-
-    amount = int(total_amount * 100)
-    if order.amount != amount:
-        return 'failure'
-
-    # 更新订单
-    order.status = 'success'
-    order.trade_no = trade_no
-    order.admin_id = 0
-
-    # 增加余额
-    user = User.query.get(order.user_id)
-    if user:
-        old_balance = user.balance or 0
-        user.balance = old_balance + amount
-
-    # 记录交易
-    tx = Transaction(
-        user_id=order.user_id, type='recharge',
-        amount=amount, balance_before=old_balance,
-        balance_after=user.balance if user else 0,
-        order_id=order.id, description=f'支付宝充值 {total_amount} 元'
-    )
-    db.session.add(tx)
-    db.session.commit()
-    return 'success'
 
 
 @app.route('/balance/top_up/alipay/return')
@@ -1300,11 +1306,15 @@ def admin_reject_recharge(oid):
 @login_required
 @admin_required
 def admin_adjust_balance():
-    data = request.get_json() or {}
+    if request.is_json:
+        data = request.get_json() or {}
+    else:
+        data = request.form.to_dict()
     phone = data.get('phone')
     user_id = data.get('user_id')
     amount = data.get('amount', 0)  # 单位：分，可正可负
     reason = data.get('reason', '').strip()
+    payment_method = data.get('payment_method', 'adjust')
     if phone:
         user = User.query.filter_by(phone=phone).first()
         if not user:
@@ -1315,16 +1325,32 @@ def admin_adjust_balance():
         return jsonify({'error': '请输入用户手机号'}), 400
     if not user:
         return jsonify({'error': '用户未找到'}), 404
-    if not user:
-        return jsonify({'error': '用户未找到'}), 404
     before = user.balance
     user.balance += int(amount)
     if user.balance < 0:
         user.balance = 0
     tt = 'adjust' if amount >= 0 else 'refund'
+    # 同时创建充值订单记录，便于在充值管理列表查看
+    order_no = 'TZ' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+    order = RechargeOrder(
+        user_id=user.id, order_no=order_no,
+        amount=abs(int(amount)), payment_method=payment_method,
+        status='success', admin_id=current_user.id,
+        remark=reason or '管理员调账'
+    )
+    # Handle voucher upload
+    voucher = request.files.get('voucher') if not request.is_json else None
+    if voucher and voucher.filename:
+        if allowed_file(voucher.filename):
+            ext = voucher.filename.rsplit('.', 1)[1].lower()
+            filename = f'voucher_{uuid.uuid4().hex}.{ext}'
+            voucher.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            order.voucher_url = url_for('uploaded_file', filename=filename)
+    db.session.add(order)
+    db.session.flush()
     tx = Transaction(user_id=user.id, type=tt, amount=amount,
                      balance_before=before, balance_after=user.balance,
-                     description=reason or '管理员调账')
+                     order_id=order.id, description=reason or '管理员调账')
     db.session.add(tx)
     db.session.commit()
     return jsonify({'ok': True, 'new_balance': user.balance})
@@ -1553,13 +1579,23 @@ def admin_delete_user(u_id):
     user = db.session.get(User, u_id)
     if not user:
         return jsonify({'error': '用户未找到'}), 404
-    # Delete associated consultations and messages first
+    # Delete associated consultations and messages
     cons = Consultation.query.filter_by(user_id=u_id).all()
     for c in cons:
         Message.query.filter_by(consultation_id=c.id).delete()
         db.session.delete(c)
     # Remove lawyer assignments
     Consultation.query.filter_by(lawyer_id=u_id).update({Consultation.lawyer_id: None})
+    # Delete recharge orders and related transactions
+    orders = RechargeOrder.query.filter_by(user_id=u_id).all()
+    for o in orders:
+        Transaction.query.filter_by(order_id=o.id).delete()
+        db.session.delete(o)
+    # Clean other foreign key references
+    Transaction.query.filter_by(user_id=u_id).delete()
+    Invoice.query.filter_by(user_id=u_id).delete()
+    ServiceOrder.query.filter_by(user_id=u_id).delete()
+    RechargeOrder.query.filter_by(admin_id=u_id).update({RechargeOrder.admin_id: None})
     db.session.delete(user)
     db.session.commit()
     return jsonify({'ok': True})

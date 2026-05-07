@@ -44,14 +44,28 @@
             <h3>手动调账</h3>
             <button class="modal-close" onclick="closeModal('adjust-modal')">&times;</button>
         </div>
-        <form id="adjust-form">
+        <form id="adjust-form" enctype="multipart/form-data">
             <div class="form-group">
                 <label>用户手机号</label>
                 <input type="text" name="phone" required placeholder="输入用户手机号">
             </div>
             <div class="form-group">
-                <label>金额（分，正数增加，负数减少）</label>
-                <input type="number" name="amount" required placeholder="例如：5000 表示增加50元">
+                <label>金额（元，正数增加，负数减少）</label>
+                <input type="number" name="amount" required placeholder="例如：500 表示增加500元" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>方式</label>
+                <select name="payment_method">
+                    <option value="manual">人工转账</option>
+                    <option value="alipay">支付宝</option>
+                    <option value="gift">赠送</option>
+                    <option value="adjust">人工调账</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>付款凭证</label>
+                <input type="file" name="voucher" accept="image/*,application/pdf">
+                <div style="font-size:0.78rem;color:#999;margin-top:4px;">选填，如有转账截图可上传</div>
             </div>
             <div class="form-group">
                 <label>原因</label>
@@ -87,7 +101,7 @@ function loadRecharges(status, el) {
                     <td style="font-size: 0.8rem;">${o.order_no}</td>
                     <td>${o.username}<br><span style="font-size:0.78rem;color:#999;">${o.phone || ''}</span></td>
                     <td style="font-weight: 500;">${(o.amount / 100).toFixed(2)}</td>
-                    <td>${o.payment_method === 'manual' ? '转账' : o.payment_method === 'alipay' ? '支付宝' : '微信'}</td>
+                    <td>${o.payment_method === 'manual' ? '人工转账' : o.payment_method === 'alipay' ? '支付宝' : o.payment_method === 'gift' ? '赠送' : o.payment_method === 'adjust' ? '人工调账' : '微信'}</td>
                     <td><span style="background: ${statusBg[o.status]}; color: ${statusColor[o.status]}; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">${statusMap[o.status] || o.status}</span></td>
                     <td>${o.voucher_url ? `<a href="${o.voucher_url}" target="_blank">查看凭证</a>` : '-'}</td>
                     <td>${o.remark || '-'}</td>
@@ -130,12 +144,12 @@ function closeModal(id) {
 
 document.getElementById('adjust-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(this));
-    data.amount = parseInt(data.amount);
+    const data = new FormData(this);
+    data.set('amount', Math.round(parseFloat(data.get('amount')) * 100));
+    if (!data.get('voucher').name) data.delete('voucher');
     fetch('/admin/adjust_balance', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
+        body: data
     })
         .then(r => r.json())
         .then(d => {
