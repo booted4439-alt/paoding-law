@@ -4,11 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}庖丁法律服务{% endblock %}</title>
+    <meta name="description" content="{% block description %}庖丁法律服务 — AI+律师双重审核，用户咨询后6小时内由专业律师回复。提供在线法律咨询、合同审核、文书代写等服务。{% endblock %}">
+    <meta name="keywords" content="{% block keywords %}法律咨询,在线律师,免费法律咨询,合同审核,文书代写,劳动仲裁,法律服务平台,AI法律咨询{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}庖丁法律服务 — 专业法律咨询{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}AI+律师双重审核，6小时内专业律师回复。在线法律咨询平台。{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://paodinglaw.com">
+    <meta property="og:image" content="https://paodinglaw.com/static/logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{% block twitter_title %}庖丁法律服务{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}AI+律师双重审核，6小时内专业律师回复。{% endblock %}">
+    <link rel="canonical" href="{% block canonical %}https://paodinglaw.com{% endblock %}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2" type="image/x-icon">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css?v={{ range(10000, 99999) | random }}">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "LegalService",
+        "name": "庖丁法律服务",
+        "url": "https://paodinglaw.com",
+        "description": "AI+律师双重审核，6小时内专业律师回复的在线法律咨询平台",
+        "areaServed": "CN",
+        "availableLanguage": ["zh-CN"]
+    }
+    </script>
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">

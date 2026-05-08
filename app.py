@@ -354,6 +354,20 @@ def logo_preview():
 
 
 @app.route('/')
+@app.route('/sitemap.xml')
+def sitemap():
+    from flask import Response
+    xml = render_template('sitemap.xml')
+    return Response(xml, mimetype='application/xml')
+
+
+@app.route('/robots.txt')
+def robots():
+    from flask import Response
+    content = 'User-agent: *\nAllow: /\nSitemap: https://paodinglaw.com/sitemap.xml\n'
+    return Response(content, mimetype='text/plain')
+
+
 def index():
     return render_template('index.html')
 
