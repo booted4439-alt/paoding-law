@@ -1680,4 +1680,7 @@ def unauthorized(e):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    socketio.run(app, debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    # 使用 Flask CLI 方式启动，避免 socketio.run 对 .xml/.txt 路由的兼容问题
+    # 如需 socketio 功能，改为 socketio.run(app, ...)
+    from werkzeug.serving import run_simple
+    run_simple('0.0.0.0', 5000, app, use_reloader=False, use_debugger=True)
