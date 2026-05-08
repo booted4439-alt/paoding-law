@@ -353,7 +353,6 @@ def logo_preview():
     return render_template('logo_preview.html')
 
 
-@app.route('/')
 @app.route('/sitemap.xml')
 def sitemap():
     from flask import Response
@@ -368,6 +367,7 @@ def robots():
     return Response(content, mimetype='text/plain')
 
 
+@app.route('/')
 def index():
     return render_template('index.html')
 
