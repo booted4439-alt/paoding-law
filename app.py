@@ -1369,7 +1369,7 @@ def admin_adjust_balance():
         data = request.form.to_dict()
     phone = data.get('phone')
     user_id = data.get('user_id')
-    amount = data.get('amount', 0)  # 单位：分，可正可负
+    amount = int(data.get('amount', 0))  # 单位：分，可正可负
     reason = data.get('reason', '').strip()
     payment_method = data.get('payment_method', 'adjust')
     if phone:
@@ -1383,7 +1383,7 @@ def admin_adjust_balance():
     if not user:
         return jsonify({'error': '用户未找到'}), 404
     before = user.balance
-    user.balance += int(amount)
+    user.balance += amount
     if user.balance < 0:
         user.balance = 0
     tt = 'adjust' if amount >= 0 else 'refund'
@@ -1391,7 +1391,7 @@ def admin_adjust_balance():
     order_no = 'TZ' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
     order = RechargeOrder(
         user_id=user.id, order_no=order_no,
-        amount=abs(int(amount)), payment_method=payment_method,
+        amount=abs(amount), payment_method=payment_method,
         status='success', admin_id=current_user.id,
         remark=reason or '管理员调账'
     )
