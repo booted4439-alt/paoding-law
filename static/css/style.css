@@ -171,7 +171,7 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
     margin-bottom: 20px;
     letter-spacing: -0.02em;
 }
-.hero-logo-text { height: 56px; vertical-align: middle; }
+.hero-logo-text { font-size: 56px; font-weight: 900; background: linear-gradient(135deg, #e8d5b7, #c6a87e 50%, #b89660); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: 6px; line-height: 1.2; display: inline-block; }
 .gradient-text {
     color: var(--text);
 }
