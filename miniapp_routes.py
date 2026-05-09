@@ -514,6 +514,7 @@ def serialize_user(user):
         'username': user.username,
         'phone': user.phone or '',
         'email': user.email,
+        'balance': user.balance or 0,
         'is_admin': user.is_admin,
         'is_lawyer': user.is_lawyer
     }
