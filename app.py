@@ -1306,13 +1306,21 @@ def admin_list_recharges():
         q = q.filter_by(status=status)
     q = q.order_by(RechargeOrder.created_at.desc()).all()
     users = {u.id: u for u in User.query.all()}
+    # 查出所有关联的Transaction，判断金额正负
+    order_ids = [o.id for o in q]
+    tx_map = {}
+    if order_ids:
+        txs = Transaction.query.filter(Transaction.order_id.in_(order_ids)).all()
+        for tx in txs:
+            if tx.order_id not in tx_map:
+                tx_map[tx.order_id] = tx.amount
     return jsonify([{
         'id': o.id,
         'order_no': o.order_no,
         'user_id': o.user_id,
         'username': users[o.user_id].username if o.user_id in users else '未知',
         'phone': users[o.user_id].phone if o.user_id in users else '',
-        'amount': o.amount,
+        'amount': o.amount if tx_map.get(o.id, 0) >= 0 else -o.amount,
         'payment_method': o.payment_method,
         'status': o.status,
         'voucher_url': o.voucher_url,

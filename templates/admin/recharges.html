@@ -100,7 +100,7 @@ function loadRecharges(status, el) {
                 html += `<tr>
                     <td style="font-size: 0.8rem;">${o.order_no}</td>
                     <td>${o.username}<br><span style="font-size:0.78rem;color:#999;">${o.phone || ''}</span></td>
-                    <td style="font-weight: 500;">${(o.amount / 100).toFixed(2)}</td>
+                    <td style="font-weight: 500; ${o.amount < 0 ? 'color: var(--danger);' : ''}">${o.amount < 0 ? '-' : ''}${(Math.abs(o.amount) / 100).toFixed(2)}</td>
                     <td>${o.payment_method === 'manual' ? '人工转账' : o.payment_method === 'alipay' ? '支付宝' : o.payment_method === 'gift' ? '赠送' : o.payment_method === 'adjust' ? '人工调账' : '微信'}</td>
                     <td><span style="background: ${statusBg[o.status]}; color: ${statusColor[o.status]}; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem;">${statusMap[o.status] || o.status}</span></td>
                     <td>${o.voucher_url ? `<a href="${o.voucher_url}" target="_blank">查看凭证</a>` : '-'}</td>
