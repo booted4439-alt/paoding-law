@@ -30,6 +30,18 @@
 
 <script>
 function adminLoadCons(status, el) {
+function deleteCons(id) {
+    if (!confirm("确定删除此咨询？相关消息也将一并删除。")) return;
+    fetch("/admin/api/consultations/" + id, { method: "DELETE" })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                adminLoadCons(document.querySelector(".admin-filters .filter-btn.active")?.getAttribute("onclick")?.match(/.([^"]+)./)?.[1] || "pending");
+            } else {
+                alert(data.error || "删除失败");
+            }
+        });
+}
     if (!el) el = document.querySelector('.admin-filters .filter-btn[onclick*="'+status+'"]') || document.querySelector('.admin-filters .filter-btn');
     document.querySelectorAll('.admin-filters .filter-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
@@ -50,7 +62,7 @@ function adminLoadCons(status, el) {
                         <td>${c.excluded_count ?? 0}</td>
                         <td>${c.message_count}</td>
                         <td>${c.created_at}</td>
-                        <td><a href="/admin/consultations/${c.id}" class="btn btn-sm btn-outline">查看</a></td>
+                        <td><a href="/admin/consultations/${c.id}" class="btn btn-sm btn-outline">查看</a> <button class="btn btn-sm btn-danger" onclick="deleteCons(${c.id})">删除</button></td>
                     </tr>`).join('')}
                 </tbody>
             </table>`;

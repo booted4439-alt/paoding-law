@@ -1127,16 +1127,19 @@ def admin_complete_consultation(c_id):
     return jsonify({'ok': True, 'fee': fee, 'fee_yuan': f'{fee/100:.0f}'})
 
 
-@app.route('/admin/documents')
+@app.route('/admin/api/consultations/<int:c_id>', methods=['DELETE'])
 @login_required
 @admin_required
-def admin_documents():
-    return render_template('admin/documents.html')
+def admin_delete_consultation(c_id):
+    c = db.session.get(Consultation, c_id)
+    if not c:
+        return jsonify({'error': '未找到咨询'}), 404
+    Message.query.filter_by(consultation_id=c.id).delete()
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify({'ok': True})
 
 
-@app.route('/admin/settings')
-@login_required
-@admin_required
 def admin_settings():
     return render_template('admin/settings.html')
 
