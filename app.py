@@ -1140,6 +1140,9 @@ def admin_delete_consultation(c_id):
     return jsonify({'ok': True})
 
 
+@app.route('/admin/settings')
+@login_required
+@admin_required
 def admin_settings():
     return render_template('admin/settings.html')
 
