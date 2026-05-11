@@ -39,7 +39,7 @@ fetch('/api/balance?type=&page=1')
         data.transactions.slice(0, 10).forEach(tx => {
             const typeMap = {recharge:'充值',consume:'消费',refund:'退款',adjust:'调账'};
                         const amt = tx.amount / 100;
-            const prefix = amt > 0 ? "+" : "";
+            const prefix = amt > 0 ? "+" : (amt < 0 ? "-" : "");
             const color = amt >= 0 ? "#4caf50" : "#e44";
             html += '<tr style="border-bottom:1px solid #f5f5f5;"><td style="padding:10px 14px;">'+ (typeMap[tx.type]||tx.type) +'</td><td style="padding:10px 14px;text-align:right;color:'+color+';">'+ prefix + Math.abs(amt).toFixed(2) +'</td><td style="padding:10px 14px;text-align:right;color:#bbb;">'+ (tx.created_at||'').substring(0,10) +'</td></tr>';
         });
