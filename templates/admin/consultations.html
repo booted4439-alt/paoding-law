@@ -30,18 +30,6 @@
 
 <script>
 function adminLoadCons(status, el) {
-function deleteCons(id) {
-    if (!confirm("确定删除此咨询？相关消息也将一并删除。")) return;
-    fetch("/admin/api/consultations/" + id, { method: "DELETE" })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                adminLoadCons(document.querySelector(".admin-filters .filter-btn.active")?.getAttribute("onclick")?.match(/.([^"]+)./)?.[1] || "pending");
-            } else {
-                alert(data.error || "删除失败");
-            }
-        });
-}
     if (!el) el = document.querySelector('.admin-filters .filter-btn[onclick*="'+status+'"]') || document.querySelector('.admin-filters .filter-btn');
     document.querySelectorAll('.admin-filters .filter-btn').forEach(b => b.classList.remove('active'));
     if (el) el.classList.add('active');
@@ -49,26 +37,34 @@ function deleteCons(id) {
         .then(r => r.json())
         .then(data => {
             const table = document.getElementById('admin-cons-table');
-            table.innerHTML = `<table>
-                <thead><tr><th>ID</th><th>标题</th><th>用户</th><th>律师</th><th>状态</th><th>律师回复次数</th><th>剔除次数</th><th>消息数</th><th>时间</th><th>操作</th></tr></thead>
-                <tbody>
-                    ${data.consultations.map(c => `<tr>
-                        <td>${c.id}</td>
-                        <td>${escHtml(c.title)}</td>
-                        <td>${escHtml(c.client)}</td>
-                        <td>${c.lawyer ? escHtml(c.lawyer) : '<span class="text-muted">未分配</span>'}</td>
-                        <td><span class="status-badge status-${c.status}">${statusLabel(c.status)}</span></td>
-                        <td>${c.lawyer_reply_count ?? 0}</td>
-                        <td>${c.excluded_count ?? 0}</td>
-                        <td>${c.message_count}</td>
-                        <td>${c.created_at}</td>
-                        <td><a href="/admin/consultations/${c.id}" class="btn btn-sm btn-outline">查看</a> <button class="btn btn-sm btn-danger" onclick="deleteCons(${c.id})">删除</button></td>
-                    </tr>`).join('')}
-                </tbody>
-            </table>`;
+            table.innerHTML = '<table><thead><tr><th>ID</th><th>标题</th><th>用户</th><th>律师</th><th>状态</th><th>律师回复次数</th><th>剔除次数</th><th>消息数</th><th>时间</th><th>操作</th></tr></thead><tbody>' +
+                data.consultations.map(function(c) {
+                    return '<tr><td>' + c.id + '</td><td>' + escHtml(c.title) + '</td><td>' + escHtml(c.client) + '</td><td>' + (c.lawyer ? escHtml(c.lawyer) : '<span class=\"text-muted\">未分配</span>') + '</td><td><span class=\"status-badge status-' + c.status + '\">' + statusLabel(c.status) + '</span></td><td>' + (c.lawyer_reply_count ?? 0) + '</td><td>' + (c.excluded_count ?? 0) + '</td><td>' + c.message_count + '</td><td>' + c.created_at + '</td><td><a href=\"/admin/consultations/' + c.id + '\" class=\"btn btn-sm btn-outline\">查看</a> <button class=\"btn btn-sm btn-danger del-cons-btn\" data-id=\"' + c.id + '\">删除</button></td></tr>';
+                }).join('') +
+                '</tbody></table>';
+            
+            // 事件委托: 点击删除按钮
+            document.querySelectorAll('.del-cons-btn').forEach(function(btn) {
+                btn.onclick = function() {
+                    var id = this.getAttribute('data-id');
+                    if (!confirm('确定删除此咨询？相关消息也将一并删除。')) return;
+                    fetch('/admin/api/consultations/' + id, { method: 'DELETE' })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.ok) {
+                                var activeBtn = document.querySelector('.admin-filters .filter-btn.active');
+                                var s = activeBtn ? activeBtn.textContent.trim() : 'pending';
+                                var statusMap = {'全部':'','待处理':'pending','进行中':'active','已完成':'completed'};
+                                adminLoadCons(statusMap[s] || '');
+                            } else {
+                                alert(data.error || '删除失败');
+                            }
+                        });
+                };
+            });
         });
 }
-function escHtml(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 function statusLabel(s) { return {'pending':'待处理','active':'进行中','completed':'已完成','closed':'已关闭'}[s]||s; }
 adminLoadCons('pending');
 </script>
