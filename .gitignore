@@ -17,3 +17,9 @@ templates/logo_preview.html
 # 备份文件
 *.bak
 *.bak.*
+
+# 敏感文件
+.alipay.env
+*.pem
+logs/
+static/qrcode/
