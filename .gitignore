@@ -13,3 +13,7 @@ static/favicon-32.png
 static/logo_test_*.png
 static/fonts/
 templates/logo_preview.html
+
+# 备份文件
+*.bak
+*.bak.*
