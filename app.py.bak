@@ -25,7 +25,7 @@ pymysql.install_as_MySQLdb()
 from werkzeug.utils import secure_filename
 
 from config import Config
-from models import db, User, Consultation, Message, SiteSetting
+from models import db, User, Consultation, Message, LegalDocument, SiteSetting
 from models import RechargeOrder, Transaction, ServicePrice, Invoice, ServiceOrder
 from services.sms import send_sms_code, check_sms_code, generate_code
 from services.mailer import notify_new_message
@@ -983,7 +983,60 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
-# ===================== ADMIN# ===================== ADMIN =====================
+# ===================== LEGAL DOCUMENTS =====================
+@app.route('/documents')
+def documents():
+    categories = db.session.query(LegalDocument.category).filter(
+        LegalDocument.is_published == True
+    ).distinct().all()
+    return render_template('documents.html', categories=[c[0] for c in categories])
+
+
+@app.route('/api/documents')
+def api_documents():
+    q = LegalDocument.query.filter_by(is_published=True)
+    kw = request.args.get('q', '').strip()
+    cat = request.args.get('category', '').strip()
+    if kw:
+        q = q.filter(LegalDocument.title.contains(kw) |
+                     LegalDocument.content.contains(kw))
+    if cat:
+        q = q.filter_by(category=cat)
+    q = q.order_by(LegalDocument.updated_at.desc()).limit(200)
+    return jsonify([{
+        'id': d.id,
+        'title': d.title,
+        'category': d.category,
+        'updated_at': d.updated_at.strftime('%Y-%m-%d'),
+    } for d in q.all()])
+
+
+@app.route('/api/documents/<int:d_id>')
+def api_document_detail(d_id):
+    d = db.session.get(LegalDocument, d_id)
+    if not d or not d.is_published:
+        return jsonify({'error': '文档未找到'}), 404
+
+    # Render markdown to HTML on the server side
+    rendered = d.content
+    try:
+        import markdown
+        rendered = markdown.markdown(d.content, extensions=['extra', 'sane_lists'])
+    except Exception:
+        # fallback: simple line break conversion
+        rendered = d.content.replace('\n', '<br>')
+
+    return jsonify({
+        'id': d.id,
+        'title': d.title,
+        'category': d.category,
+        'content': d.content,
+        'rendered': rendered,
+        'updated_at': d.updated_at.strftime('%Y-%m-%d'),
+    })
+
+
+# ===================== ADMIN =====================
 @app.route('/admin', strict_slashes=False)
 @login_required
 @admin_required
@@ -1131,6 +1184,82 @@ def admin_complete_consultation(c_id):
 @admin_required
 def admin_documents():
     return render_template('admin/documents.html')
+
+
+@app.route('/admin/api/documents', methods=['GET'])
+@login_required
+@admin_required
+def admin_list_documents():
+    q = LegalDocument.query.order_by(LegalDocument.updated_at.desc()).all()
+    return jsonify([{
+        'id': d.id,
+        'title': d.title,
+        'category': d.category,
+        'is_published': d.is_published,
+        'updated_at': d.updated_at.strftime('%Y-%m-%d'),
+    } for d in q])
+
+
+@app.route('/admin/api/documents/<int:d_id>', methods=['GET'])
+@login_required
+@admin_required
+def admin_get_document(d_id):
+    d = db.session.get(LegalDocument, d_id)
+    if not d:
+        return jsonify({'error': '未找到'}), 404
+    return jsonify({
+        'id': d.id,
+        'title': d.title,
+        'category': d.category,
+        'content': d.content,
+        'is_published': d.is_published,
+        'updated_at': d.updated_at.strftime('%Y-%m-%d'),
+    })
+
+
+@app.route('/admin/api/documents', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_document():
+    data = request.get_json() or {}
+    d = LegalDocument(
+        title=data.get('title', '').strip(),
+        category=data.get('category', 'general').strip(),
+        content=data.get('content', ''),
+        is_published=data.get('is_published', True),
+    )
+    db.session.add(d)
+    db.session.commit()
+    return jsonify({'id': d.id}), 201
+
+
+@app.route('/admin/api/documents/<int:d_id>', methods=['PUT'])
+@login_required
+@admin_required
+def admin_update_document(d_id):
+    d = db.session.get(LegalDocument, d_id)
+    if not d:
+        return jsonify({'error': '未找到'}), 404
+    data = request.get_json() or {}
+    for field in ('title', 'category', 'content'):
+        if field in data:
+            setattr(d, field, data[field])
+    if 'is_published' in data:
+        d.is_published = bool(data['is_published'])
+    d.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/documents/<int:d_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_document(d_id):
+    d = db.session.get(LegalDocument, d_id)
+    if d:
+        db.session.delete(d)
+        db.session.commit()
+    return jsonify({'ok': True})
 
 
 @app.route('/admin/settings')

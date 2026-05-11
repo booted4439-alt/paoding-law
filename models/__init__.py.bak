@@ -71,6 +71,18 @@ class Message(db.Model):
     sender = db.relationship('User', foreign_keys=[sender_id])
 
 
+class LegalDocument(db.Model):
+    __tablename__ = 'legal_documents'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(300), nullable=False)
+    category = db.Column(db.String(100), default='general')
+    content = db.Column(db.Text, nullable=False)
+    is_published = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now,
+                           onupdate=_now)
+
+
 class SiteSetting(db.Model):
     __tablename__ = 'site_settings'
     id = db.Column(db.Integer, primary_key=True)
