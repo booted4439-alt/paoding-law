@@ -162,7 +162,7 @@ def wechat_login():
         user = User.query.filter_by(openid=openid).first()
         if not user:
             # 新用户：优先使用微信昵称
-            uname = nickname if nickname else '新用户'
+            uname = nickname if nickname else f'微信用户_{openid[:8]}'
             user = User(
                 username=uname,
                 email=None,
@@ -355,11 +355,18 @@ def _merge_wechat_user(temp_user, existing_user, phone, email=''):
     old_id = temp_user.id
     new_id = existing_user.id
 
-    # 1. 转移微信身份
-    if temp_user.openid and not existing_user.openid:
-        existing_user.openid = temp_user.openid
-    if temp_user.wx_session_key and not existing_user.wx_session_key:
-        existing_user.wx_session_key = temp_user.wx_session_key
+    # 先提取临时账户的 openid/session_key，清空后刷新，避免唯一约束冲突
+    openid_temp = temp_user.openid
+    wx_key_temp = temp_user.wx_session_key
+    temp_user.openid = None
+    temp_user.wx_session_key = None
+    db.session.flush()
+
+    # 1. 转移微信身份到老用户
+    if openid_temp and not existing_user.openid:
+        existing_user.openid = openid_temp
+    if wx_key_temp and not existing_user.wx_session_key:
+        existing_user.wx_session_key = wx_key_temp
 
     # 2. 更新老用户的手机号（其实已经有了，确认一下）
     existing_user.phone = phone
@@ -396,7 +403,6 @@ def _merge_wechat_user(temp_user, existing_user, phone, email=''):
     # 律师分配（老用户是律师的情况）
     Consultation.query.filter_by(lawyer_id=old_id).update(
         {Consultation.lawyer_id: new_id}, synchronize_session=False)
-    Consultation.query.filter_by(lawyer_id=None).update({})  # noop, just safety
 
     # 6. 删除临时账户
     db.session.delete(temp_user)
