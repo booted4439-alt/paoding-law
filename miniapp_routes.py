@@ -224,10 +224,20 @@ def wechat_bind_phone(current_user):
         else:
             return jsonify({'error': '请输入短信验证码'}), 400
 
-        # 检查重复
+        # 检查重复 → 合并到老账户
         existing = User.query.filter_by(phone=phone).first()
         if existing and existing.id != current_user.id:
-            return jsonify({'error': '该手机号已被其他账号绑定'}), 400
+            # 🔥 已有用户：合并临时微信账户到老账户
+            _merge_wechat_user(current_user, existing, phone, email)
+            new_token = generate_token(existing.id)
+            return jsonify({
+                'ok': True,
+                'token': new_token,
+                'user': serialize_user(existing),
+                'needs_bind': False,
+                'has_phone': True,
+                'merged': True
+            })
 
         current_user.phone = phone
 
@@ -279,7 +289,17 @@ def wechat_bind_phone(current_user):
 
         existing = User.query.filter_by(phone=phone).first()
         if existing and existing.id != current_user.id:
-            return jsonify({'error': '该手机号已被其他账号绑定'}), 400
+            # 🔥 已有用户：合并临时微信账户到老账户
+            _merge_wechat_user(current_user, existing, phone, email)
+            new_token = generate_token(existing.id)
+            return jsonify({
+                'ok': True,
+                'token': new_token,
+                'user': serialize_user(existing),
+                'needs_bind': False,
+                'has_phone': True,
+                'merged': True
+            })
 
         current_user.phone = phone
         current_user.wx_session_key = None
@@ -316,6 +336,86 @@ def wechat_bind_phone(current_user):
     except Exception as e:
         current_app.logger.error(f'绑定手机号解密出错: {e}')
         return jsonify({'error': '手机号获取失败，请重试'}), 500
+
+
+def _merge_wechat_user(temp_user, existing_user, phone, email=''):
+    """
+    合并临时微信账户到已有手机账户
+
+    场景：微信一键登录创建了一个临时账户（有 openid 无 phone），
+    绑定手机号时发现该手机已注册 → 把临时账户的微信身份转给老账户。
+
+    合并内容：
+    - 转移 openid / wx_session_key 到老用户
+    - 转移咨询记录、消息、订单、交易等业务数据
+    - 删除临时账户
+    """
+    from models import Consultation, Message, RechargeOrder, Transaction, Invoice, ServiceOrder
+
+    old_id = temp_user.id
+    new_id = existing_user.id
+
+    # 1. 转移微信身份
+    if temp_user.openid and not existing_user.openid:
+        existing_user.openid = temp_user.openid
+    if temp_user.wx_session_key and not existing_user.wx_session_key:
+        existing_user.wx_session_key = temp_user.wx_session_key
+
+    # 2. 更新老用户的手机号（其实已经有了，确认一下）
+    existing_user.phone = phone
+
+    # 3. 更新邮箱（选填，老用户没有才填）
+    if email and not existing_user.email:
+        existing_user.email = email
+
+    # 4. 更新用户名（如果老用户是默认名）
+    if existing_user.username in ('新用户',) or existing_user.username.startswith('微信用户_') or existing_user.username.startswith('用户_') or existing_user.username.startswith('mini_'):
+        existing_user.username = f'用户_{phone[-4:]}'
+
+    # 5. 转移业务数据
+    # 咨询记录：改 user_id
+    Consultation.query.filter_by(user_id=old_id).update(
+        {Consultation.user_id: new_id}, synchronize_session=False)
+    # 消息发送者
+    Message.query.filter_by(sender_id=old_id).update(
+        {Message.sender_id: new_id}, synchronize_session=False)
+    # 充值订单
+    RechargeOrder.query.filter_by(user_id=old_id).update(
+        {RechargeOrder.user_id: new_id}, synchronize_session=False)
+    RechargeOrder.query.filter_by(admin_id=old_id).update(
+        {RechargeOrder.admin_id: new_id}, synchronize_session=False)
+    # 交易记录
+    Transaction.query.filter_by(user_id=old_id).update(
+        {Transaction.user_id: new_id}, synchronize_session=False)
+    # 发票
+    Invoice.query.filter_by(user_id=old_id).update(
+        {Invoice.user_id: new_id}, synchronize_session=False)
+    # 服务订单
+    ServiceOrder.query.filter_by(user_id=old_id).update(
+        {ServiceOrder.user_id: new_id}, synchronize_session=False)
+    # 律师分配（老用户是律师的情况）
+    Consultation.query.filter_by(lawyer_id=old_id).update(
+        {Consultation.lawyer_id: new_id}, synchronize_session=False)
+    Consultation.query.filter_by(lawyer_id=None).update({})  # noop, just safety
+
+    # 6. 删除临时账户
+    db.session.delete(temp_user)
+
+    # 7. 如果老用户余额为 0，赠送 300 元
+    if not existing_user.balance or existing_user.balance == 0:
+        existing_user.balance = 30000
+        order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
+        order = RechargeOrder(user_id=existing_user.id, order_no=order_no, amount=30000,
+                              payment_method='gift', status='success', admin_id=None,
+                              remark='合并账户赠送')
+        db.session.add(order)
+        db.session.flush()
+        tx = Transaction(user_id=existing_user.id, type='recharge', amount=30000,
+                         balance_before=0, balance_after=30000,
+                         order_id=order.id, description='赠送')
+        db.session.add(tx)
+
+    db.session.commit()
 
 
 def decrypt_phone_number(encrypted_data, session_key, iv, appid):
