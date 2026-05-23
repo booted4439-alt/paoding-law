@@ -66,7 +66,13 @@ a:hover { text-decoration: underline; }
 .nav-avatar {
     width: 32px;
     height: 32px;
-    border-radius: 8px;
+    border-radius: 50%;
+}
+
+/* navbar logo (tiger head) */
+.nav-logo-img {
+    width: 44px;
+    height: 44px;
 }
 .nav-links {
     display: flex;

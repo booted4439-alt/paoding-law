@@ -10,16 +10,16 @@
     <meta property="og:description" content="{% block og_description %}AI+律师双重审核，6小时内专业律师回复。在线法律咨询平台。{% endblock %}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://paodinglaw.com">
-    <meta property="og:image" content="https://paodinglaw.com/static/logo.png">
+    <meta property="og:image" content="https://paodinglaw.com/static/logo.svg">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="{% block twitter_title %}演算法律服务{% endblock %}">
     <meta name="twitter:description" content="{% block twitter_description %}AI+律师双重审核，6小时内专业律师回复。{% endblock %}">
     <link rel="canonical" href="{% block canonical %}https://paodinglaw.com{% endblock %}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}?v=2" type="image/x-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='logo.png') }}">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=13">    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png?v=1">    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png?v=1">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=13">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v={{ range(10000, 99999) | random }}">
+    <link rel="stylesheet" href="/static/css/style.css?v=13{{ range(10000, 99999) | random }}">
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -37,7 +37,7 @@
     <nav class="nav {% block nav_class %}nav-hidden{% endblock %}">
         <div class="nav-inner">
             <a href="/" class="nav-logo">
-                <img src="{{ url_for('static', filename='avatar.png') }}" alt="演算" class="nav-avatar">
+                <img src="/static/logo-nav.svg?v=13" alt="庖丁法律" class="nav-logo-img">
                 <span>{{ get_setting('site_name') }}</span>
             </a>
             <div class="nav-links">

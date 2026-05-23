@@ -1,0 +1,29 @@
+<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tiger-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9800"/>
+      <stop offset="100%" stop-color="#E65100"/>
+    </linearGradient>
+  </defs>
+  <!-- 头部 -->
+  <path d="M60 10 C90 10 105 30 105 55 C105 85 90 105 60 110 C30 105 15 85 15 55 C15 30 30 10 60 10Z" fill="url(#tiger-gradient)"/>
+  <!-- 耳朵 -->
+  <path d="M25 25 L15 8 L38 20 Z" fill="#E65100"/>
+  <path d="M95 25 L105 8 L82 20 Z" fill="#E65100"/>
+  <!-- 额纹 王 -->
+  <rect x="35" y="18" width="50" height="5" rx="2.5" fill="#2C1810"/>
+  <rect x="32" y="28" width="56" height="5" rx="2.5" fill="#2C1810"/>
+  <rect x="57.5" y="13" width="5" height="25" rx="2.5" fill="#2C1810"/>
+  <!-- 眼睛 -->
+  <circle cx="40" cy="50" r="8" fill="#2C1810"/>
+  <circle cx="80" cy="50" r="8" fill="#2C1810"/>
+  <!-- 鼻子 -->
+  <polygon points="55,68 65,68 60,76" fill="#050810"/>
+  <!-- 嘴 -->
+  <path d="M 50 76 Q 60 82 70 76" stroke="#050810" stroke-width="3" stroke-linecap="round"/>
+  <!-- 胡须 -->
+  <line x1="30" y1="66" x2="8" y2="62" stroke="#050810" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="30" y1="74" x2="6" y2="76" stroke="#050810" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="90" y1="66" x2="112" y2="62" stroke="#050810" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <line x1="90" y1="74" x2="114" y2="76" stroke="#050810" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+</svg>
