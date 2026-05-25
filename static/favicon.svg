@@ -7,9 +7,6 @@
   </defs>
   <!-- Background circle -->
   <circle cx="90" cy="90" r="88" fill="#f5f7fa" stroke="url(#g1)" stroke-width="3"/>
-  <!-- ∫ dx 居中放大 -->
-  <g transform="translate(90,100)">
-    <text x="-55" y="20" fill="url(#g1)" font-size="120" font-family="'Times New Roman', Georgia, serif" font-style="italic" font-weight="bold" text-anchor="middle">∫</text>
-    <text x="28" y="35" fill="#2d6a9f" font-size="48" font-family="'Times New Roman', Georgia, serif" font-style="italic" font-weight="bold">dx</text>
-  </g>
+  <!-- ∫dx 整体字符串 -->
+  <text x="90" y="110" fill="url(#g1)" font-size="80" font-family="'Times New Roman', Georgia, serif" font-style="italic" font-weight="bold" text-anchor="middle">∫dx</text>
 </svg>
