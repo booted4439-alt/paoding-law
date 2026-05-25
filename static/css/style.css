@@ -178,6 +178,7 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
     letter-spacing: -0.02em;
 }
 .hero-logo-text { font-size: 56px; font-weight: 900; background: linear-gradient(135deg, #e8d5b7, #c6a87e 50%, #b89660); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: 6px; line-height: 1.2; display: inline-block; }
+.hero-logo-img { height: 90px; width: auto; display: inline-block; }
 .gradient-text {
     color: var(--text);
 }
@@ -1218,6 +1219,7 @@ body.home-page { background: url('/static/bg_main.png') no-repeat center top / c
     .nav-links { display: none; flex-direction: column; position: absolute; top: 64px; left: 0; right: 0; background: var(--bg); border-bottom: 1px solid var(--border-light); padding: 16px; }
     .nav-links.open { display: flex; }
     .hero-title { font-size: 2rem; }
+    .hero-logo-img { height: 60px; }
     .features-grid { grid-template-columns: 1fr; }
     .stats-inner { grid-template-columns: repeat(2, 1fr); }
     .docs-layout { position: relative; }
