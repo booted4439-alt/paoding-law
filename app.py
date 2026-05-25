@@ -104,7 +104,7 @@ def init_db():
     db.create_all()
     # seed admin
     if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', email='admin@paodinglaw.com',
+        admin = User(username='admin', email='admin@calculuslaw.com',
                      phone='13800000000', is_admin=True, is_lawyer=True)
         admin.set_password('admin123')
         db.session.add(admin)
@@ -114,7 +114,7 @@ def init_db():
         'wechat_qr': '',
         'address': '上海市浦东新区陆家嘴环路1000号',
         'phone': '021-6888-8888',
-        'email': 'contact@paodinglaw.com',
+        'email': 'contact@calculuslaw.com',
         'icp_beian': '沪ICP备2025XXXXXX号',
         'police_beian': '',
         'privacy_content': '# 隐私政策\n\n我们重视您的隐私...',
@@ -243,7 +243,7 @@ def wechat_web_callback():
                 pass
             user = User(
                 username=nickname,
-                email=f'{openid}@wechat.paodinglaw.com',
+                email=f'{openid}@wechat.calculuslaw.com',
                 openid=openid,
                 phone=None
             )
@@ -364,7 +364,7 @@ def sitemap():
 @app.route('/robots.txt')
 def robots():
     from flask import Response
-    content = 'User-agent: *\nAllow: /\nSitemap: https://paodinglaw.com/sitemap.xml\n'
+    content = 'User-agent: *\nAllow: /\nSitemap: https://calculuslaw.com/sitemap.xml\n'
     return Response(content, mimetype='text/plain')
 
 
@@ -716,7 +716,7 @@ def create_consultation():
             try:
                 from services.mailer import send_email
                 subject = f'新咨询 - {title}'
-                body = f'用户 {current_user.username}（{current_user.phone or "未绑定手机"}）提交了新咨询。\n\n标题: {title}\n内容: {description}\n\n查看详情：https://paodinglaw.com/admin/consultations/{c.id}'
+                body = f'用户 {current_user.username}（{current_user.phone or "未绑定手机"}）提交了新咨询。\n\n标题: {title}\n内容: {description}\n\n查看详情：https://calculuslaw.com/admin/consultations/{c.id}'
                 send_email(contact_email, subject, body)
             except Exception as e:
                 print(f'[EMAIL] 通知发送失败: {e}')
@@ -953,7 +953,7 @@ def send_message(c_id):
                 body = (
                     f'{current_user.username} 回复了您的咨询「{c.title or "法律咨询"}」。\n\n'
                     f'回复内容：{msg.content or "(文件消息)"}\n\n'
-                    f'点击查看：https://paodinglaw.com/consult/{c.id}'
+                    f'点击查看：https://calculuslaw.com/consult/{c.id}'
                 )
                 send_email(owner.email, subject, body)
             except Exception as e:

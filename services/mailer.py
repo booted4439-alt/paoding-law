@@ -35,6 +35,6 @@ def notify_new_message(consultation, message, sender, contact_email):
         f"用户 {sender.username}（{sender.phone or '未绑定手机'}）"
         f"在咨询「{consultation.title or '法律咨询'}」中发送了一条新消息。\n\n"
         f"消息内容：\n{message.content or '(文件消息)'}\n\n"
-        f"查看详情：https://paodinglaw.com/admin/consultations/{consultation.id}"
+        f"查看详情：https://calculuslaw.com/admin/consultations/{consultation.id}"
     )
     return send_email(contact_email, subject, body)

@@ -4,8 +4,8 @@ set -e
 
 APP_DIR="/var/www/paodinglaw"
 PYTHON="/usr/local/python310/bin/python3"
-NGINX_CONF="/etc/nginx/conf.d/paodinglaw.com.conf"
-DOMAIN="paodinglaw.com"
+NGINX_CONF="/etc/nginx/conf.d/calculuslaw.com.conf"
+DOMAIN="calculuslaw.com"
 
 echo "🔪 部署庖丁法律服务..."
 
@@ -49,7 +49,7 @@ echo "🔧 配置Nginx..."
 cat > "$NGINX_CONF" << 'NGINXEOF'
 server {
     listen 80;
-    server_name paodinglaw.com www.paodinglaw.com;
+    server_name calculuslaw.com www.calculuslaw.com;
     
     client_max_body_size 500M;
 
@@ -115,8 +115,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    access_log /var/log/nginx/paodinglaw_access.log;
-    error_log /var/log/nginx/paodinglaw_error.log;
+    access_log /var/log/nginx/calculuslaw_access.log;
+    error_log /var/log/nginx/calculuslaw_error.log;
 }
 NGINXEOF
 

@@ -30,5 +30,5 @@ class Config:
     ITEMS_PER_PAGE = 20
 
     # 支付宝配置
-    ALIPAY_NOTIFY_URL = os.environ.get('ALIPAY_NOTIFY_URL', 'https://paodinglaw.com/api/alipay/notify')
-    ALIPAY_RETURN_URL = os.environ.get('ALIPAY_RETURN_URL', 'https://paodinglaw.com/balance/top_up/alipay/return')
+    ALIPAY_NOTIFY_URL = os.environ.get('ALIPAY_NOTIFY_URL', 'https://calculuslaw.com/api/alipay/notify')
+    ALIPAY_RETURN_URL = os.environ.get('ALIPAY_RETURN_URL', 'https://calculuslaw.com/balance/top_up/alipay/return')
