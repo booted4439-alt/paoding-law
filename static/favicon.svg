@@ -6,9 +6,6 @@
     </linearGradient>
   </defs>
   <circle cx="90" cy="90" r="88" fill="#f5f7fa" stroke="url(#g1)" stroke-width="4"/>
-  <!-- ∫dx 整体居中放大加粗 -->
-  <g transform="translate(88, 95)">
-    <text x="-25" y="22" fill="url(#g1)" stroke="url(#g1)" stroke-width="6" stroke-linejoin="round" font-size="88" font-family="Times New Roman, Georgia, serif" font-style="italic" font-weight="bold" text-anchor="middle">∫</text>
-    <text x="18" y="32" fill="#2d6a9f" font-size="38" font-family="Times New Roman, Georgia, serif" font-style="italic" font-weight="bold">dx</text>
-  </g>
+  <!-- ∫dx 一个字符串 -->
+  <text x="88" y="112" fill="url(#g1)" stroke="url(#g1)" stroke-width="6" stroke-linejoin="round" font-size="80" font-family="Times New Roman, Georgia, serif" font-style="italic" font-weight="bold" text-anchor="middle">∫dx</text>
 </svg>
