@@ -8,8 +8,6 @@ static/uploads/*
 !static/uploads/.gitkeep
 static/fonts/*
 !static/fonts/.gitkeep
-static/favicon-16.png
-static/favicon-32.png
 static/logo_test_*.png
 static/fonts/
 templates/logo_preview.html
