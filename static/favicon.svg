@@ -1,4 +1,69 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-  <circle cx="90" cy="90" r="90" fill="#1a3a5c"/>
-  <text x="90" y="128" fill="#fff" stroke="#fff" stroke-width="10" stroke-linejoin="round" font-size="110" font-family="Times New Roman, Georgia, serif" font-style="italic" font-weight="bold" text-anchor="middle">∫</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="演算法律服务">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset=".55" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="55%">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity=".55"/>
+      <stop offset="55%" stop-color="#3b82f6" stop-opacity=".12"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <circle cx="32" cy="28" r="25" fill="url(#glow)"/>
+
+  <!-- Wings -->
+  <g fill="none" stroke="url(#wing)" stroke-linecap="round">
+    <path stroke-width="3.5" d="M17,26 C12,34 11,42 14,47"/>
+    <path stroke-width="4" d="M20,29 C15,38 14,45 17,50"/>
+    <path stroke-width="3.5" d="M47,26 C52,34 53,42 50,47"/>
+    <path stroke-width="4" d="M44,29 C49,38 50,45 47,50"/>
+  </g>
+
+  <!-- Body -->
+  <ellipse cx="32" cy="36" rx="14" ry="16" fill="url(#body)"/>
+
+  <!-- Head -->
+  <ellipse cx="32" cy="23" rx="17" ry="15" fill="url(#body)"/>
+
+  <!-- Ear tufts -->
+  <path d="M16,11 L20,20 L13,21 Z" fill="url(#body)"/>
+  <path d="M48,11 L44,20 L51,21 Z" fill="url(#body)"/>
+
+  <!-- Eyes -->
+  <ellipse cx="24" cy="22" rx="6.5" ry="7.5" fill="#fff"/>
+  <ellipse cx="40" cy="22" rx="6.5" ry="7.5" fill="#fff"/>
+
+  <!-- Pupils -->
+  <circle cx="24" cy="23" r="3.5" fill="#0b0b12"/>
+  <circle cx="40" cy="23" r="3.5" fill="#0b0b12"/>
+
+  <!-- Eye highlights -->
+  <circle cx="22.5" cy="21.5" r="1.5" fill="#fff" opacity=".9"/>
+  <circle cx="38.5" cy="21.5" r="1.5" fill="#fff" opacity=".9"/>
+
+  <!-- Angry brows -->
+  <path d="M14,12 L22,18" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M50,12 L42,18" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Beak -->
+  <path d="M30,27 L32,31 L34,27 Z" fill="#f59e0b"/>
+
+  <!-- Chest feather marks -->
+  <g fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity=".15">
+    <path d="M27,33 Q32,35 37,33"/>
+    <path d="M28,36 Q32,38 36,36"/>
+  </g>
 </svg>
