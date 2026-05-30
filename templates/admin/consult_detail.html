@@ -43,7 +43,7 @@
                 <form onsubmit="return adminSend(event)">
                     <button type="button" class="upload-btn" onclick="document.getElementById('admin-file-input').click()">📎</button>
                     <input type="file" id="admin-file-input" multiple style="display:none" onchange="adminHandleFiles(this.files)">
-                    <textarea id="admin-msg-input" rows="2" placeholder="回复消息..." oninput="adminAutoResize(this)"></textarea>
+                    <textarea id="admin-msg-input" rows="3" placeholder="回复消息..." oninput="adminAutoResize(this)"></textarea>
                     <button type="submit" class="send-btn">发送</button>
                     <div class="file-previews" id="admin-file-previews"></div>
                 </form>

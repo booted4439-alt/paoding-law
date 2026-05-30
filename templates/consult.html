@@ -43,7 +43,7 @@
             <p class="chat-empty-desc">直接输入您的问题，开始法律咨询</p>
             <div class="chat-empty-input">
                 <form onsubmit="return submitFirstMessage(event)">
-                    <textarea id="first-message-input" rows="1" placeholder="输入您的问题，支持上传文件..." oninput="autoResize(this)" onkeydown="onFirstInputKeydown(event)"></textarea>
+                    <textarea id="first-message-input" rows="3" placeholder="输入您的问题，支持上传文件..." oninput="autoResize(this)" onkeydown="onFirstInputKeydown(event)"></textarea>
                     <button type="button" class="upload-btn" onclick="document.getElementById('first-file-input').click()">📎</button>
                     <input type="file" id="first-file-input" multiple style="display:none" onchange="handleFirstFiles(this.files)">
                     <button type="submit" class="send-btn">发送</button>
@@ -77,7 +77,7 @@
                 <form id="message-form" onsubmit="return sendMessage(event)">
                     <button type="button" class="upload-btn" onclick="document.getElementById('file-input').click()" title="上传文件">📎</button>
                     <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this.files)">
-                    <textarea id="message-input" rows="1" placeholder="输入您的问题..." oninput="autoResize(this)" onkeydown="onMsgInputKeydown(event)"></textarea>
+                    <textarea id="message-input" rows="3" placeholder="输入您的问题..." oninput="autoResize(this)" onkeydown="onMsgInputKeydown(event)"></textarea>
                     <button type="submit" class="send-btn">发送</button>
                     <div class="file-previews" id="file-previews"></div>
                 </form>
