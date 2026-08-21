@@ -14,82 +14,15 @@
     <p style="text-align: center; color: #1a73e8; font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;">每次100元</p>
     <p style="text-align: center; color: #e44; font-size: 0.9rem; font-weight: 600; margin-bottom: 32px;">新注册用户可获赠300元体验金</p>
 
-    {% if not categories %}
-    <p style="text-align: center; color: #999;">暂无定价信息</p>
-    {% endif %}
-
-    <div class="pricing-cols">
-    {% for cat, items in categories.items() %}
-    <div style="border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden;">
-        <div style="font-size: 1rem; font-weight: 600; padding: 12px 14px; background: #f8f9fa; border-bottom: 1px solid #e5e5e5;">
-            {% if cat == 'consult' %}📋 法律咨询
-            {% elif cat == 'contract' %}📄 合同服务
-            {% elif cat == 'document' %}📑 文书代写
-            {% else %}{{ cat }}{% endif %}
-        </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-            <tbody>
-            {% for p in items %}
-            <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 10px 14px;">
-                    {{ p.name }}
-                    {% if p.description %}
-                    <br><span style="font-size: 0.78rem; color: #999;">{{ p.description }}</span>
-                    {% endif %}
-                </td>
-                <td style="padding: 10px 14px; text-align: right; font-weight: 600; color: #e44; white-space: nowrap; width: 50px;">{{ '%.0f'|format(p.price/10000) }}次</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endfor %}
-    </div>
-
-    <!-- 企业套餐 -->
-    <div style="margin-top: 40px;">
-        <h2 style="font-size: 1.2rem; font-weight: 600; text-align: center; margin-bottom: 16px;">🏢 企业套餐</h2>
-        <p style="text-align: center; color: #888; font-size: 0.85rem; margin-bottom: 20px;">充值越多，赠送越多，不限消费年限</p>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-            <div style="border: 1px solid #e5e5e5; border-radius: 8px; padding: 24px 16px; text-align: center;">
-                <div style="font-size: 1.3rem; font-weight: 700; color: #333;">3,000</div>
-                <div style="font-size: 0.85rem; color: #888; margin: 4px 0;">充3000元</div>
-                <div style="background: #e8f0fe; color: #1a73e8; font-size: 0.85rem; font-weight: 500; padding: 4px 12px; border-radius: 12px; display: inline-block; margin-top: 8px;">赠送500元</div>
-                <div style="font-size: 0.78rem; color: #999; margin-top: 8px;">到手3500元</div>
-            </div>
-            <div style="border: 1px solid #e5e5e5; border-radius: 8px; padding: 24px 16px; text-align: center;">
-                <div style="font-size: 1.3rem; font-weight: 700; color: #333;">5,000</div>
-                <div style="font-size: 0.85rem; color: #888; margin: 4px 0;">充5000元</div>
-                <div style="background: #e8f0fe; color: #1a73e8; font-size: 0.85rem; font-weight: 500; padding: 4px 12px; border-radius: 12px; display: inline-block; margin-top: 8px;">赠送1100元</div>
-                <div style="font-size: 0.78rem; color: #999; margin-top: 8px;">到手6100元</div>
-            </div>
-            <div style="border: 1px solid #1a73e8; border-radius: 8px; padding: 24px 16px; text-align: center; box-shadow: 0 2px 8px rgba(26,115,232,0.15);">
-                <div style="font-size: 1.3rem; font-weight: 700; color: #1a73e8;">10,000</div>
-                <div style="font-size: 0.85rem; color: #888; margin: 4px 0;">充10000元</div>
-                <div style="background: #1a73e8; color: #fff; font-size: 0.85rem; font-weight: 500; padding: 4px 12px; border-radius: 12px; display: inline-block; margin-top: 8px;">赠送3500元</div>
-                <div style="font-size: 0.78rem; color: #1a73e8; margin-top: 8px; font-weight: 500;">到手13500元</div>
-            </div>
-            <div style="border: 1px solid #e5e5e5; border-radius: 8px; padding: 24px 16px; text-align: center;">
-                <div style="font-size: 1.3rem; font-weight: 700; color: #333;">20,000</div>
-                <div style="font-size: 0.85rem; color: #888; margin: 4px 0;">充20000元</div>
-                <div style="background: #e8f0fe; color: #1a73e8; font-size: 0.85rem; font-weight: 500; padding: 4px 12px; border-radius: 12px; display: inline-block; margin-top: 8px;">赠送11000元</div>
-                <div style="font-size: 0.78rem; color: #999; margin-top: 8px;">到手31000元</div>
-            </div>
-        </div>
-    </div>
-
     <!-- 收费规则 -->
     <div style="margin-top: 40px; background: #f8f9fa; border-radius: 8px; padding: 24px; max-width: 700px; margin-left: auto; margin-right: auto;">
         <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;">📋 收费规则</h2>
         <ul style="padding-left: 20px; margin: 0; font-size: 0.85rem; line-height: 1.8; color: #555;">
             <li>用户发起咨询后，律师根据咨询内容预估价格并通过咨询消息告知用户</li>
             <li>用户需充值不低于预估价格，以保证咨询服务的正常进行</li>
-            <li>服务完成后，根据(律师回复次数 - 剔除次数) × 100元 扣费</li>
             <li>剔除次数由律师判断，为非专业性法律服务信息的回复（如寒暄、确认等），不计入收费</li>
-            <li>充值低于预估价格的，除非经济特别困难且提供相关证明，否则不提供法律服务</li>
             <li>实际扣费以咨询完成时核算的（律师回复次数 - 剔除次数）× 100元 为准</li>
         </ul>
-        <p style="margin-top: 12px; font-size: 0.78rem; color: #999; border-top: 1px solid #eee; padding-top: 12px;">注：价格页面的价格数据仅为预估价格，并非最后的扣费标准。实际扣费以咨询完成时核算为准。</p>
     </div>
 
     <p style="text-align: center; margin-top: 32px; font-size: 0.85rem; color: #999;">
@@ -97,9 +30,4 @@
     </p>
 </div>
 
-<style>
-.pricing-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 768px) { .pricing-cols { grid-template-columns: 1fr; } }
-@media (max-width: 768px) { .pricing-cols + div [style*="grid-template-columns"] { grid-template-columns: 1fr 1fr !important; } }
-</style>
 {% endblock %}

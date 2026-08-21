@@ -27,7 +27,7 @@ from werkzeug.utils import secure_filename
 
 from config import Config
 from models import db, User, Consultation, Message, SiteSetting
-from models import RechargeOrder, Transaction, ServicePrice, Invoice, ServiceOrder
+from models import RechargeOrder, Transaction, Invoice, ServiceOrder
 from services.sms import send_sms_code, check_sms_code, generate_code
 from services.mailer import notify_new_message
 
@@ -397,11 +397,7 @@ def contact():
 # ===================== PRICING =====================
 @app.route('/pricing')
 def pricing():
-    prices = ServicePrice.query.filter_by(is_active=True).order_by(ServicePrice.sort_order).all()
-    categories = {}
-    for p in prices:
-        categories.setdefault(p.category, []).append(p)
-    return render_template('pricing.html', categories=categories)
+    return render_template('pricing.html')
 
 
 # ===================== BALANCE =====================
@@ -1297,86 +1293,6 @@ def admin_adjust_balance():
     db.session.add(tx)
     db.session.commit()
     return jsonify({'ok': True, 'new_balance': user.balance})
-
-
-# ===================== ADMIN: SERVICE PRICES =====================
-@app.route('/admin/prices')
-@login_required
-@admin_required
-def admin_prices():
-    return render_template('admin/prices.html')
-
-
-@app.route('/admin/api/prices', methods=['GET'])
-@login_required
-@admin_required
-def admin_list_prices():
-    prices = ServicePrice.query.order_by(ServicePrice.sort_order).all()
-    return jsonify([{
-        'id': p.id,
-        'name': p.name,
-        'category': p.category,
-        'price': p.price,
-        'description': p.description or '',
-        'sort_order': p.sort_order,
-        'is_active': p.is_active,
-    } for p in prices])
-
-
-@app.route('/admin/api/prices', methods=['POST'])
-@login_required
-@admin_required
-def admin_create_price():
-    data = request.get_json() or {}
-    name = data.get('name', '').strip()
-    if not name:
-        return jsonify({'error': '名称必填'}), 400
-    price = ServicePrice(
-        name=name,
-        category=data.get('category', 'consult'),
-        price=int(float(data.get('price', 0)) * 100),
-        description=data.get('description', '').strip(),
-        sort_order=data.get('sort_order', 0),
-        is_active=data.get('is_active', True),
-    )
-    db.session.add(price)
-    db.session.commit()
-    return jsonify({'id': price.id}), 201
-
-
-@app.route('/admin/api/prices/<int:pid>', methods=['PUT'])
-@login_required
-@admin_required
-def admin_update_price(pid):
-    price = db.session.get(ServicePrice, pid)
-    if not price:
-        return jsonify({'error': '未找到'}), 404
-    data = request.get_json() or {}
-    if 'name' in data:
-        price.name = data['name'].strip()
-    if 'category' in data:
-        price.category = data['category']
-    if 'price' in data:
-        price.price = int(float(data['price']) * 100)
-    if 'description' in data:
-        price.description = data['description'].strip()
-    if 'sort_order' in data:
-        price.sort_order = data['sort_order']
-    if 'is_active' in data:
-        price.is_active = bool(data['is_active'])
-    db.session.commit()
-    return jsonify({'ok': True})
-
-
-@app.route('/admin/api/prices/<int:pid>', methods=['DELETE'])
-@login_required
-@admin_required
-def admin_delete_price(pid):
-    price = db.session.get(ServicePrice, pid)
-    if price:
-        db.session.delete(price)
-        db.session.commit()
-    return jsonify({'ok': True})
 
 
 # ===================== ADMIN: INVOICE MANAGEMENT =====================

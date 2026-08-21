@@ -130,20 +130,6 @@ class Transaction(db.Model):
     order = db.relationship('RechargeOrder', foreign_keys=[order_id])
 
 
-class ServicePrice(db.Model):
-    """服务价格"""
-    __tablename__ = 'service_prices'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    category = db.Column(db.String(30), nullable=False, default='consult')  # consult/contract/document/other
-    price = db.Column(db.Integer, nullable=False, default=0)  # 分
-    description = db.Column(db.String(500))
-    sort_order = db.Column(db.Integer, default=0)
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=_now)
-    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
-
-
 class Invoice(db.Model):
     """发票"""
     __tablename__ = 'invoices'
@@ -167,7 +153,6 @@ class ServiceOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     service_type = db.Column(db.String(50), nullable=False)
-    price_id = db.Column(db.Integer, db.ForeignKey('service_prices.id'), nullable=True)
     amount = db.Column(db.Integer, default=0)  # 分
     status = db.Column(db.String(20), default='pending')  # pending/paid/completed/refunded
     consultation_id = db.Column(db.Integer, db.ForeignKey('consultations.id'), nullable=True)
@@ -177,5 +162,4 @@ class ServiceOrder(db.Model):
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
     user = db.relationship('User', foreign_keys=[user_id])
-    price = db.relationship('ServicePrice', foreign_keys=[price_id])
     consultation = db.relationship('Consultation', foreign_keys=[consultation_id])
