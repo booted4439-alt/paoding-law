@@ -18,10 +18,4 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /var/www/paodinglaw
-            git fetch origin
-            git reset --hard origin/main
-            /usr/local/python310/bin/pip3 install -r requirements.txt --quiet
-            # Restart gunicorn
-            supervisorctl restart paodinglaw 2>/dev/null || systemctl restart paodinglaw 2>/dev/null || \
-              (kill -HUP $(cat /tmp/gunicorn.pid 2>/dev/null) 2>/dev/null) || \
-              echo "Manual restart needed"
+            bash deploy.sh
