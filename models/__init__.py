@@ -93,6 +93,19 @@ class SiteSetting(db.Model):
         db.session.commit()
 
 
+def get_consult_unit_price():
+    """读取网站设置的咨询单价（元/次），非法值回退默认 100 元"""
+    try:
+        return float(SiteSetting.get('consult_unit_price', '100') or 100)
+    except (ValueError, TypeError):
+        return 100.0
+
+
+def get_register_gift_amount():
+    """注册/绑定手机/合并账户赠送体验金 = 单价×2，返回单位：分"""
+    return int(round(get_consult_unit_price() * 2 * 100))
+
+
 class RechargeOrder(db.Model):
     """充值订单"""
     __tablename__ = 'recharge_orders'

@@ -28,6 +28,7 @@ from werkzeug.utils import secure_filename
 from config import Config
 from models import db, User, Consultation, Message, SiteSetting
 from models import RechargeOrder, Transaction, Invoice, ServiceOrder
+from models import get_consult_unit_price, get_register_gift_amount
 from services.sms import send_sms_code, check_sms_code, generate_code
 from services.mailer import notify_new_message
 
@@ -287,19 +288,20 @@ def auth_register():
         if phone and User.query.filter_by(phone=phone).first():
             flash('该手机号已注册', 'error')
         else:
-            user = User(username=username, email=email, phone=phone, balance=30000)
+            gift = get_register_gift_amount()
+            user = User(username=username, email=email, phone=phone, balance=gift)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
-            # 赠送300元
+            # 赠送体验金 = 单价×2
             order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
-            order = RechargeOrder(user_id=user.id, order_no=order_no, amount=30000,
+            order = RechargeOrder(user_id=user.id, order_no=order_no, amount=gift,
                                   payment_method='gift', status='success', admin_id=None,
                                   remark='注册赠送')
             db.session.add(order)
             db.session.flush()
-            tx = Transaction(user_id=user.id, type='recharge', amount=30000,
-                             balance_before=0, balance_after=30000,
+            tx = Transaction(user_id=user.id, type='recharge', amount=gift,
+                             balance_before=0, balance_after=gift,
                              order_id=order.id, description='赠送')
             db.session.add(tx)
             db.session.commit()
@@ -397,10 +399,7 @@ def contact():
 # ===================== PRICING =====================
 @app.route('/pricing')
 def pricing():
-    try:
-        unit_price = float(SiteSetting.get('consult_unit_price', '100') or 100)
-    except (ValueError, TypeError):
-        unit_price = 100.0
+    unit_price = get_consult_unit_price()
     return render_template('pricing.html',
                            unit_price_str=f'{unit_price:g}',
                            bonus_str=f'{unit_price * 2:g}')
@@ -699,8 +698,8 @@ def create_consultation():
         return jsonify({'error': '请输入咨询标题'}), 400
     if not current_user.phone and not current_user.is_admin:
         return jsonify({'error': '请先绑定手机号'}), 403
-    if not current_user.is_admin and not current_user.is_lawyer and current_user.balance < 10000:
-        return jsonify({'error': '余额不足，咨询需账户余额不低于100元，请先充值'}), 403
+    if not current_user.is_admin and not current_user.is_lawyer and current_user.balance < int(round(get_consult_unit_price() * 100)):
+        return jsonify({'error': f'余额不足，咨询需账户余额不低于{get_consult_unit_price():.0f}元，请先充值'}), 403
     c = Consultation(title=title, description=description, user_id=current_user.id)
     db.session.add(c)
     db.session.flush()
@@ -738,8 +737,8 @@ def create_consultation_with_message():
         return jsonify({'error': '请输入您的问题'}), 400
     if not current_user.phone and not current_user.is_admin:
         return jsonify({'error': '请先绑定手机号'}), 403
-    if not current_user.is_admin and not current_user.is_lawyer and current_user.balance < 10000:
-        return jsonify({'error': '余额不足，咨询需账户余额不低于100元，请先充值'}), 403
+    if not current_user.is_admin and not current_user.is_lawyer and current_user.balance < int(round(get_consult_unit_price() * 100)):
+        return jsonify({'error': f'余额不足，咨询需账户余额不低于{get_consult_unit_price():.0f}元，请先充值'}), 403
 
     # Validate limits
     files = request.files.getlist('file')
@@ -1098,10 +1097,7 @@ def admin_complete_consultation(c_id):
     excluded = c.excluded_count or 0
     payable = reply_count - excluded
     # 单价从网站设置读取（元/次），默认100元；内部统一换算为分
-    try:
-        unit_price_yuan = float(SiteSetting.get('consult_unit_price', '100') or 100)
-    except (ValueError, TypeError):
-        unit_price_yuan = 100.0
+    unit_price_yuan = get_consult_unit_price()
     unit_price = int(round(unit_price_yuan * 100))
     fee = payable * unit_price
 

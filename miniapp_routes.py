@@ -14,6 +14,7 @@ from functools import wraps
 
 from flask import Blueprint, request, jsonify, current_app
 from models import db, User, SiteSetting, Transaction, RechargeOrder
+from models import get_consult_unit_price, get_register_gift_amount
 
 # ---- 无状态 Token（多 worker 兼容） ----
 # 使用 HMAC 签名，不依赖内存存储
@@ -249,18 +250,19 @@ def wechat_bind_phone(current_user):
         if email:
             current_user.email = email
 
-        # 首次绑定手机赠送300元
+        # 首次绑定手机赠送体验金 = 单价×2
         if current_user.balance is None or current_user.balance == 0:
             from models import Transaction
-            current_user.balance = 30000
+            gift = get_register_gift_amount()
+            current_user.balance = gift
             order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
-            order = RechargeOrder(user_id=current_user.id, order_no=order_no, amount=30000,
+            order = RechargeOrder(user_id=current_user.id, order_no=order_no, amount=gift,
                                   payment_method='gift', status='success', admin_id=None,
                                   remark='绑定手机赠送')
             db.session.add(order)
             db.session.flush()
-            tx = Transaction(user_id=current_user.id, type='recharge', amount=30000,
-                             balance_before=0, balance_after=30000,
+            tx = Transaction(user_id=current_user.id, type='recharge', amount=gift,
+                             balance_before=0, balance_after=gift,
                              order_id=order.id, description='赠送')
             db.session.add(tx)
 
@@ -311,18 +313,19 @@ def wechat_bind_phone(current_user):
         if email:
             current_user.email = email
 
-        # 首次绑定手机赠送300元
+        # 首次绑定手机赠送体验金 = 单价×2
         if current_user.balance is None or current_user.balance == 0:
             from models import Transaction
-            current_user.balance = 30000
+            gift = get_register_gift_amount()
+            current_user.balance = gift
             order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
-            order = RechargeOrder(user_id=current_user.id, order_no=order_no, amount=30000,
+            order = RechargeOrder(user_id=current_user.id, order_no=order_no, amount=gift,
                                   payment_method='gift', status='success', admin_id=None,
                                   remark='绑定手机赠送')
             db.session.add(order)
             db.session.flush()
-            tx = Transaction(user_id=current_user.id, type='recharge', amount=30000,
-                             balance_before=0, balance_after=30000,
+            tx = Transaction(user_id=current_user.id, type='recharge', amount=gift,
+                             balance_before=0, balance_after=gift,
                              order_id=order.id, description='赠送')
             db.session.add(tx)
 
@@ -407,17 +410,18 @@ def _merge_wechat_user(temp_user, existing_user, phone, email=''):
     # 6. 删除临时账户
     db.session.delete(temp_user)
 
-    # 7. 如果老用户余额为 0，赠送 300 元
+    # 7. 如果老用户余额为 0，赠送体验金 = 单价×2
     if not existing_user.balance or existing_user.balance == 0:
-        existing_user.balance = 30000
+        gift = get_register_gift_amount()
+        existing_user.balance = gift
         order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
-        order = RechargeOrder(user_id=existing_user.id, order_no=order_no, amount=30000,
+        order = RechargeOrder(user_id=existing_user.id, order_no=order_no, amount=gift,
                               payment_method='gift', status='success', admin_id=None,
                               remark='合并账户赠送')
         db.session.add(order)
         db.session.flush()
-        tx = Transaction(user_id=existing_user.id, type='recharge', amount=30000,
-                         balance_before=0, balance_after=30000,
+        tx = Transaction(user_id=existing_user.id, type='recharge', amount=gift,
+                         balance_before=0, balance_after=gift,
                          order_id=order.id, description='赠送')
         db.session.add(tx)
 
@@ -546,24 +550,25 @@ def mini_register():
     if User.query.filter_by(phone=phone).first():
         return jsonify({'error': '该手机号已注册'}), 400
 
-    # 创建用户（赠送300元）
+    # 创建用户（赠送体验金 = 单价×2）
+    gift = get_register_gift_amount()
     user = User(
         username=username,
         email=email or None,
         phone=phone,
-        balance=30000
+        balance=gift
     )
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
     order_no = 'ZS' + datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:8].upper()
-    order = RechargeOrder(user_id=user.id, order_no=order_no, amount=30000,
+    order = RechargeOrder(user_id=user.id, order_no=order_no, amount=gift,
                           payment_method='gift', status='success', admin_id=None,
                           remark='注册赠送')
     db.session.add(order)
     db.session.flush()
-    tx = Transaction(user_id=user.id, type='recharge', amount=30000,
-                     balance_before=0, balance_after=30000,
+    tx = Transaction(user_id=user.id, type='recharge', amount=gift,
+                     balance_before=0, balance_after=gift,
                      order_id=order.id, description='赠送')
     db.session.add(tx)
     db.session.commit()
@@ -621,6 +626,7 @@ def serialize_user(user):
         'phone': user.phone or '',
         'email': user.email,
         'balance': user.balance or 0,
+        'unit_price': int(round(get_consult_unit_price() * 100)),  # 咨询单价（分）
         'is_admin': user.is_admin,
         'is_lawyer': user.is_lawyer
     }
