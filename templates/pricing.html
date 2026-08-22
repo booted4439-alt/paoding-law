@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}价格 — 演算法律服务{% endblock %}
-{% block description %}演算法律服务价格 — AI+律师审核咨询每次100元，新注册用户可获赠300元体验金。提供在线法律咨询、合同起草审核、文书代写等服务。{% endblock %}
+{% block description %}演算法律服务价格 — AI+律师审核咨询每次{{ unit_price_str }}元，新注册用户可获赠{{ bonus_str }}元体验金。提供在线法律咨询、合同起草审核、文书代写等服务。{% endblock %}
 {% block keywords %}法律咨询价格,律师咨询费用,在线法律咨询收费,合同审核收费,文书代写价格{% endblock %}
 {% block canonical %}https://calculuslaw.com/pricing{% endblock %}
 {% block body_class %}{% endblock %}
@@ -11,8 +11,8 @@
 <div style="max-width: 1100px; margin: 0 auto; padding: 32px 16px;">
     <h1 style="font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 4px;">价格</h1>
     <p style="text-align: center; color: #1a73e8; font-size: 0.95rem; font-weight: 500; margin-bottom: 4px;">AI辅助+律师审核回复为一次，每一条回复信息均经过律师审核</p>
-    <p style="text-align: center; color: #1a73e8; font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;">每次100元</p>
-    <p style="text-align: center; color: #e44; font-size: 0.9rem; font-weight: 600; margin-bottom: 32px;">新注册用户可获赠300元体验金</p>
+    <p style="text-align: center; color: #1a73e8; font-size: 0.85rem; font-weight: 500; margin-bottom: 8px;">每次{{ unit_price_str }}元</p>
+    <p style="text-align: center; color: #e44; font-size: 0.9rem; font-weight: 600; margin-bottom: 32px;">新注册用户可获赠{{ bonus_str }}元体验金</p>
 
     <!-- 收费规则 -->
     <div style="margin-top: 40px; background: #f8f9fa; border-radius: 8px; padding: 24px; max-width: 700px; margin-left: auto; margin-right: auto;">
@@ -21,7 +21,7 @@
             <li>用户发起咨询后，律师根据咨询内容预估消费并通过咨询消息告知用户</li>
             <li>用户需充值不低于预估消费，以保证咨询服务的正常进行</li>
             <li>剔除次数由律师判断，为非专业性法律服务信息的回复（如寒暄、确认等），不计入收费</li>
-            <li>实际扣费以咨询完成时核算的（律师回复次数 - 剔除次数）× 100元 为准</li>
+            <li>实际扣费以咨询完成时核算的（律师回复次数 - 剔除次数）× {{ unit_price_str }}元 为准</li>
             <li>价格可能发生变动，演算法律服务保留修改价格的权利。请您依据实际用量按需充值，定期查看此页面以获知最新价格信息。</li>
         </ul>
     </div>

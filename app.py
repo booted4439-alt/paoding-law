@@ -397,7 +397,13 @@ def contact():
 # ===================== PRICING =====================
 @app.route('/pricing')
 def pricing():
-    return render_template('pricing.html')
+    try:
+        unit_price = float(SiteSetting.get('consult_unit_price', '100') or 100)
+    except (ValueError, TypeError):
+        unit_price = 100.0
+    return render_template('pricing.html',
+                           unit_price_str=f'{unit_price:g}',
+                           bonus_str=f'{unit_price * 2:g}')
 
 
 # ===================== BALANCE =====================
@@ -1091,7 +1097,12 @@ def admin_complete_consultation(c_id):
     reply_count = c.lawyer_reply_count or 0
     excluded = c.excluded_count or 0
     payable = reply_count - excluded
-    unit_price = 10000  # 100元/次，单位为分
+    # 单价从网站设置读取（元/次），默认100元；内部统一换算为分
+    try:
+        unit_price_yuan = float(SiteSetting.get('consult_unit_price', '100') or 100)
+    except (ValueError, TypeError):
+        unit_price_yuan = 100.0
+    unit_price = int(round(unit_price_yuan * 100))
     fee = payable * unit_price
 
     owner = db.session.get(User, c.user_id)
@@ -1111,7 +1122,7 @@ def admin_complete_consultation(c_id):
             balance_before=before,
             balance_after=owner.balance,
             service_type='consult',
-            description=f'咨询完成扣费 {fee/100:.0f} 元（{reply_count}次律师回复 - {excluded}次剔除 = {payable}次×100元）'
+            description=f'咨询完成扣费 {fee/100:.0f} 元（{reply_count}次律师回复 - {excluded}次剔除 = {payable}次×{unit_price_yuan:g}元）'
         )
         db.session.add(tx)
 
@@ -1148,7 +1159,8 @@ def admin_settings():
 @admin_required
 def admin_get_settings():
     keys = ['site_name', 'wechat_qr', 'address', 'phone', 'email',
-            'icp_beian', 'police_beian', 'privacy_content', 'terms_content']
+            'icp_beian', 'police_beian', 'privacy_content', 'terms_content',
+            'consult_unit_price']
     return jsonify({k: SiteSetting.get(k) for k in keys})
 
 
