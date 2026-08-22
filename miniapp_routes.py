@@ -211,6 +211,7 @@ def wechat_bind_phone(current_user):
     phone = data.get('phone', '').strip()
     sms_code = data.get('sms_code', '').strip()
     email = data.get('email', '').strip()
+    password = data.get('password', '').strip()
 
     # ---- 模式1 & 3：手动输入手机号 ----
     if phone:
@@ -225,11 +226,20 @@ def wechat_bind_phone(current_user):
         else:
             return jsonify({'error': '请输入短信验证码'}), 400
 
+        # 设置登录密码（必填，用于网页端密码登录，校验规则同注册页）
+        import re
+        if not password:
+            return jsonify({'error': '请设置登录密码'}), 400
+        if len(password) < 6:
+            return jsonify({'error': '密码至少6位'}), 400
+        if not re.match(r'^[a-zA-Z0-9]+$', password):
+            return jsonify({'error': '密码只能包含字母和数字'}), 400
+
         # 检查重复 → 合并到老账户
         existing = User.query.filter_by(phone=phone).first()
         if existing and existing.id != current_user.id:
             # 🔥 已有用户：合并临时微信账户到老账户
-            _merge_wechat_user(current_user, existing, phone, email)
+            _merge_wechat_user(current_user, existing, phone, email, password)
             new_token = generate_token(existing.id)
             return jsonify({
                 'ok': True,
@@ -241,6 +251,7 @@ def wechat_bind_phone(current_user):
             })
 
         current_user.phone = phone
+        current_user.set_password(password)
 
         # 绑定成功后，更新用户名为手机号关联的名字
         if current_user.username in ('新用户',) or current_user.username.startswith('微信用户_') or current_user.username.startswith('mini_'):
@@ -292,7 +303,7 @@ def wechat_bind_phone(current_user):
         existing = User.query.filter_by(phone=phone).first()
         if existing and existing.id != current_user.id:
             # 🔥 已有用户：合并临时微信账户到老账户
-            _merge_wechat_user(current_user, existing, phone, email)
+            _merge_wechat_user(current_user, existing, phone, email, password)
             new_token = generate_token(existing.id)
             return jsonify({
                 'ok': True,
@@ -305,6 +316,15 @@ def wechat_bind_phone(current_user):
 
         current_user.phone = phone
         current_user.wx_session_key = None
+
+        # 设置登录密码（选填，用于网页端密码登录）
+        if password:
+            import re
+            if len(password) < 6:
+                return jsonify({'error': '密码至少6位'}), 400
+            if not re.match(r'^[a-zA-Z0-9]+$', password):
+                return jsonify({'error': '密码只能包含字母和数字'}), 400
+            current_user.set_password(password)
 
         # 绑定成功后，更新用户名为手机号关联的名字
         if current_user.username in ('新用户',) or current_user.username.startswith('微信用户_') or current_user.username.startswith('用户_') or current_user.username.startswith('mini_'):
@@ -341,7 +361,7 @@ def wechat_bind_phone(current_user):
         return jsonify({'error': '手机号获取失败，请重试'}), 500
 
 
-def _merge_wechat_user(temp_user, existing_user, phone, email=''):
+def _merge_wechat_user(temp_user, existing_user, phone, email='', password=''):
     """
     合并临时微信账户到已有手机账户
 
@@ -377,6 +397,10 @@ def _merge_wechat_user(temp_user, existing_user, phone, email=''):
     # 3. 更新邮箱（选填，老用户没有才填）
     if email and not existing_user.email:
         existing_user.email = email
+
+    # 设置登录密码（绑定页填写，用于网页端密码登录）
+    if password:
+        existing_user.set_password(password)
 
     # 4. 更新用户名（如果老用户是默认名）
     if existing_user.username in ('新用户',) or existing_user.username.startswith('微信用户_') or existing_user.username.startswith('用户_') or existing_user.username.startswith('mini_'):
