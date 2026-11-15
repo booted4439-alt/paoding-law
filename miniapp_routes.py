@@ -511,20 +511,7 @@ def mini_login():
     if not user:
         return jsonify({'error': '手机号未注册'}), 400
 
-    # 支持验证码直接登录（密码=验证码）
-    try:
-        from services.sms import check_sms_code
-        sms_result = check_sms_code(phone, password)
-        if sms_result.get('success') and sms_result.get('verify_result') == 'PASS':
-            token = generate_token(user.id)
-            return jsonify({
-                'token': token,
-                'user': serialize_user(user)
-            })
-    except Exception:
-        pass
-
-    # 密码登录
+    # 仅支持密码登录（验证码登录已下线）
     if not user.check_password(password):
         return jsonify({'error': '密码错误'}), 400
 
@@ -544,7 +531,6 @@ def mini_register():
     username = data.get('username', '').strip()
     phone = data.get('phone', '').strip()
     password = data.get('password', '').strip()
-    sms_code = data.get('sms_code', '').strip()
     email = data.get('email', '').strip()
 
     if not username:
@@ -556,19 +542,7 @@ def mini_register():
     if not re.match(r'^[a-zA-Z0-9]+$', password):
         return jsonify({'error': '密码只能包含字母和数字'}), 400
 
-    # 验证短信验证码
-    if phone and sms_code:
-        try:
-            from services.sms import check_sms_code
-            verify_result = check_sms_code(phone, sms_code)
-            if not (verify_result.get('success') and
-                    verify_result.get('verify_result') == 'PASS'):
-                return jsonify({'error': '验证码错误或已过期'}), 400
-        except Exception as e:
-            current_app.logger.error(f'验证码核验出错: {e}')
-            return jsonify({'error': '验证码核验失败'}), 500
-    else:
-        return jsonify({'error': '请完成手机验证'}), 400
+    # 短信验证码已验证取消（小程序注册不再需要验证码）
 
     # 检查重复
     if User.query.filter_by(phone=phone).first():
