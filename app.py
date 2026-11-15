@@ -131,39 +131,17 @@ def init_db():
 # ===================== AUTH =====================
 @app.route('/auth/login', methods=['GET', 'POST'])
 def auth_login():
-    login_mode = 'password'
     if request.method == 'POST':
+        # 仅支持密码登录（验证码登录已下线）
         phone = request.form.get('phone', '').strip()
-        login_mode = request.form.get('login_mode', 'password')
-
-        if login_mode == 'sms':
-            # 验证码登录
-            sms_code = request.form.get('sms_code', '').strip()
-            if not sms_code:
-                flash('请输入验证码', 'error')
-                return render_template('login.html', login_mode='sms')
-            from services.sms import check_sms_code
-            verify_result = check_sms_code(phone, sms_code)
-            if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
-                flash('验证码错误或已过期', 'error')
-                return render_template('login.html', login_mode='sms')
-            user = User.query.filter_by(phone=phone).first()
-            if user:
-                login_user(user)
-                next_page = request.args.get('next')
-                return redirect(next_page or url_for('index'))
-            flash('该手机号未注册', 'error')
-            return render_template('login.html', login_mode='sms')
-        else:
-            # 密码登录
-            password = request.form.get('password', '')
-            user = User.query.filter_by(phone=phone).first()
-            if user and user.check_password(password):
-                login_user(user)
-                next_page = request.args.get('next')
-                return redirect(next_page or url_for('index'))
-            flash('手机号或密码错误', 'error')
-    return render_template('login.html', login_mode=login_mode)
+        password = request.form.get('password', '')
+        user = User.query.filter_by(phone=phone).first()
+        if user and user.check_password(password):
+            login_user(user)
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        flash('手机号或密码错误', 'error')
+    return render_template('login.html')
 
 
 # ===================== 微信扫码登录（网站） =====================
@@ -268,21 +246,15 @@ def auth_register():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         phone = request.form.get('phone', '').strip()
-        sms_code = request.form.get('sms_code', '').strip()
 
         # 密码校验
         if password and not validate_password(password):
             flash('密码只能包含字母和数字', 'error')
             return render_template('register.html')
 
-        # 核验短信验证码
-        if phone and sms_code:
-            verify_result = check_sms_code(phone, sms_code)
-            if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
-                flash('短信验证码错误或已过期', 'error')
-                return render_template('register.html')
-        else:
-            flash('请完成手机验证', 'error')
+        # 手机号必填校验（已取消短信验证码验证）
+        if not phone:
+            flash('请填写手机号码', 'error')
             return render_template('register.html')
 
         if phone and User.query.filter_by(phone=phone).first():

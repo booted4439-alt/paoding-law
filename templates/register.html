@@ -11,7 +11,7 @@
             <input type="text" name="username" required placeholder="用户名">
         </div>
         <div class="form-group">
-            <input type="email" name="email" placeholder="邮箱(选填,律师回复时可以收到邮件通知)">
+            <input type="tel" name="phone" id="reg-phone" required pattern="1\d{10}" placeholder="手机号码（11位）" maxlength="11">
         </div>
         <div class="form-group">
             <div class="pwd-field">
@@ -30,13 +30,7 @@
             </div>
         </div>
         <div class="form-group">
-            <input type="tel" name="phone" id="reg-phone" required pattern="1\d{10}" placeholder="手机号码（11位）" maxlength="11">
-        </div>
-        <div class="form-group">
-            <div class="sms-row">
-                <input type="text" name="sms_code" id="reg-sms-code" required placeholder="速通互联验证码" maxlength="6" pattern="\d{4,6}">
-                <button type="button" class="btn btn-sm btn-outline" id="send-sms-btn" onclick="sendSmsCode()">获取验证码</button>
-            </div>
+            <input type="email" name="email" placeholder="邮箱(选填,律师回复时可以收到邮件通知)">
         </div>
         <p class="agreement-text">注册即代表已阅读并同意我们的 <a href="/terms" target="_blank">用户协议</a> 与 <a href="/privacy" target="_blank">隐私政策</a></p>
         <button type="submit" class="btn btn-primary btn-block">注册</button>
@@ -48,75 +42,11 @@
 .agreement-text { text-align: center; font-size: 13px; color: var(--text-muted, #999); margin-bottom: 16px; }
 .agreement-text a { color: var(--primary, #07c160); text-decoration: none; }
 .agreement-text a:hover { text-decoration: underline; }
-.sms-row { display: flex; gap: 8px; }
-.sms-row input { flex: 1; }
-.sms-row button { flex-shrink: 0; white-space: nowrap; }
-#send-sms-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Flash errors are handled by base.html */
 </style>
 
 <script>
-let smsTimer = 0;
-let smsCountdown = 0;
-
-function sendSmsCode() {
-    const phone = document.getElementById('reg-phone').value.trim();
-    if (!/^1\d{10}$/.test(phone)) {
-        alert('请输入正确的11位手机号');
-        return;
-    }
-
-    const btn = document.getElementById('send-sms-btn');
-    btn.disabled = true;
-    btn.textContent = '发送中...';
-
-    fetch('/api/sms/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('验证码已发送，请查收短信');
-            startCountdown(60);
-        } else {
-            alert(data.message || '发送失败，请稍后重试');
-            btn.disabled = false;
-            btn.textContent = '获取验证码';
-        }
-    })
-    .catch(() => {
-        alert('网络错误，请重试');
-        btn.disabled = false;
-        btn.textContent = '获取验证码';
-    });
-}
-
-function startCountdown(seconds) {
-    const btn = document.getElementById('send-sms-btn');
-    smsCountdown = seconds;
-    btn.textContent = smsCountdown + 's';
-    clearInterval(smsTimer);
-    smsTimer = setInterval(() => {
-        smsCountdown--;
-        if (smsCountdown <= 0) {
-            clearInterval(smsTimer);
-            btn.disabled = false;
-            btn.textContent = '重新获取';
-        } else {
-            btn.textContent = smsCountdown + 's';
-        }
-    }, 1000);
-}
-
 function validateForm(e) {
-    const code = document.getElementById('reg-sms-code').value.trim();
-    if (code.length < 4) {
-        alert('请输入短信验证码');
-        e.preventDefault();
-        return false;
-    }
     const pwd = document.querySelector('[name="password"]').value;
     const confirmPwd = document.querySelector('[name="confirm_password"]').value;
     if (!/^[0-9a-zA-Z]+$/.test(pwd)) {
