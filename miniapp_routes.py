@@ -197,8 +197,8 @@ def wechat_login():
 @token_required
 def wechat_bind_phone(current_user):
     """
-    绑定手机号到微信账号（支持短信验证码验证）
-    模式1：phone + sms_code → 短信验证码验证后绑定
+    绑定手机号到微信账号
+    模式1：phone (+ 可选 password/email) → 直接绑定（短信验证码已下线，仍兼容传 sms_code 校验）
     模式2：encryptedData + iv → 微信 getPhoneNumber 解密绑定
     模式3：phone (dev-only) → 开发环境直接绑定
     可选参数：email → 同时更新邮箱
@@ -218,13 +218,13 @@ def wechat_bind_phone(current_user):
         if not phone.isdigit() or len(phone) < 5:
             return jsonify({'error': '手机号格式不正确'}), 400
 
-        # 模式1：短信验证码验证
+        # 短信验证码已下线：仅当客户端传了 sms_code 时才校验（兼容旧版小程序）
+        sms_verified = False
         if sms_code:
             verify_result = check_sms_code(phone, sms_code)
             if not (verify_result.get('success') and verify_result.get('verify_result') == 'PASS'):
                 return jsonify({'error': '验证码错误或已过期'}), 400
-        else:
-            return jsonify({'error': '请输入短信验证码'}), 400
+            sms_verified = True
 
         # 设置登录密码（必填，用于网页端密码登录，校验规则同注册页）
         import re
@@ -238,6 +238,9 @@ def wechat_bind_phone(current_user):
         # 检查重复 → 合并到老账户
         existing = User.query.filter_by(phone=phone).first()
         if existing and existing.id != current_user.id:
+            # 🔒 安全：未做短信验证时不允许合并到已有账户（否则可用手机号直接接管他人账号）
+            if not sms_verified:
+                return jsonify({'error': '该手机号已注册，请返回用手机号+密码登录'}), 409
             # 🔥 已有用户：合并临时微信账户到老账户
             _merge_wechat_user(current_user, existing, phone, email, password)
             new_token = generate_token(existing.id)
